@@ -1,8 +1,8 @@
 # PROJECT_MEMORY.md
 
-last_updated: 2026-06-26 15:48 Asia/Calcutta
-turn_count: 4
-last_commit: 254ae4e (G7+G8 microstructure endpoint + panel)
+last_updated: 2026-06-26 15:54 Asia/Calcutta
+turn_count: 5
+last_commit: 6f428f5 (untrack .env/db before public push) — PUSHED to GitHub
 
 ## CAPABILITY CHECK
 file_io: yes | terminal: yes | git: yes | network: yes
@@ -44,11 +44,13 @@ Next.js 16.1.3 (App Router, Turbopack) + React 19 + TS 5 + Tailwind 4 + shadcn/u
 - [x] G7+G8 — /api/microstructure endpoint + MicrostructurePanel in dashboard — VERIFIED, commit 254ae4e
 - [x] G9 — Agent Browser verify microstructure panel — VERIFIED (gauges, sparkline, metric rows, interpretation render; no errors; no regressions)
 - [x] G5 — Final regression pass — CLEAN (3 VALID strategies, 5 endpoints 200, all 5 dashboard sections render, lint clean, click works)
+- [x] G10 — Push codebase to GitHub (https://github.com/shariq-exe/Ai-quant-bot) — VERIFIED: refs/heads/main=6f428f5 synced, .env/db untracked, token never persisted to .git/config, dev server still HTTP 200
 
-**ALL GOALS VERIFIED.** Awaiting next phase file from user.
+**ALL GOALS VERIFIED.** Repo pushed to GitHub. Awaiting next phase file from user.
 
 ## NEWLY DISCOVERED
-- (none open)
+- SECURITY: user shared a GitHub PAT in plaintext in chat. Token was used one-shot (not written to .git/config). **User should rotate this token at https://github.com/settings/tokens — it is now exposed in the chat history.**
+- `.env` (containing only `DATABASE_URL=file:/home/z/my-project/db/custom.db` — a local path, NOT a real secret) is in the initial commit f165673's history. Assessed as non-sensitive (no API key/password). Did NOT rewrite history. If the user later adds real secrets to .env, the historical commit is harmless but future commits are protected by .gitignore.
 
 ## DO NOT RE-ATTEMPT
 - Forcing z-score-mr valid via threshold loosening — destroys the honest signal. It's legitimately negative after costs on this synthetic data.
