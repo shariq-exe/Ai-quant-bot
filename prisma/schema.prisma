@@ -1,8 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// Quantitative Trading System — Prisma schema
+// SQLite datasource. Domain: strategies, signals, trades, backtest runs.
 
 generator client {
   provider = "prisma-client-js"
@@ -13,20 +10,72 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model Strategy {
+  id          String   @id @default(cuid())
+  code        String   @unique // e.g. "zscore-mr"
+  name        String
+  type        String   // mean-reversion | momentum | breakout | carry
+  description String
+  params      String   @default("{}") // JSON-encoded parameter set
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  signals     Signal[]
+  trades      Trade[]
+  runs        BacktestRun[]
 }
 
-model Post {
-  id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model Signal {
+  id         String   @id @default(cuid())
+  strategyId String
+  strategy   Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  symbol     String   // EUR/USD | XAU/USD
+  direction  String   // long | short | flat
+  confidence Float    // 0..1
+  price      Float
+  rationale  String
+  createdAt  DateTime @default(now())
+
+  @@index([strategyId, symbol, createdAt])
+}
+
+model Trade {
+  id         String   @id @default(cuid())
+  strategyId String
+  strategy   Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  symbol     String
+  side       String   // long | short
+  entryTime  DateTime
+  exitTime   DateTime
+  entryPrice Float
+  exitPrice  Float
+  bars       Int
+  pnl        Float
+  pnlPct     Float
+  exitReason String
+  createdAt  DateTime @default(now())
+
+  @@index([strategyId, symbol])
+}
+
+model BacktestRun {
+  id          String   @id @default(cuid())
+  strategyId  String
+  strategy    Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  symbol      String
+  startYear   Int
+  endYear     Int
+  trades      Int
+  sharpe      Float
+  sortino     Float
+  maxDrawdown Float
+  hitRate     Float
+  profitFactor Float
+  pValue      Float
+  expectancy  Float
+  stats       String   @default("{}") // full JSON stats blob
+  createdAt   DateTime @default(now())
+
+  @@index([strategyId, symbol])
 }
