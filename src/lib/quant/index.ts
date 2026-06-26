@@ -7,6 +7,8 @@ import { generateSeries, generateLiveTick, SYMBOL_CONFIG } from "./market-data";
 import { STRATEGIES, getStrategy } from "./strategies";
 import { runBacktest, type BacktestConfig, type BacktestResult } from "./backtest";
 import type { StrategySummary } from "./backtest";
+import { computeMicrostructure } from "./microstructure";
+import type { MicrostructureReport } from "./microstructure";
 
 // 1-hour bars over ~11 years → ~96k bars per symbol. Long enough that validated
 // strategies accumulate >1000 trades at their proper (non-overfit) thresholds.
@@ -156,4 +158,20 @@ export function getRecentBars(symbol: Symbol, n: number): Bar[] {
 
 export function getSymbolConfig(symbol: Symbol) {
   return SYMBOL_CONFIG[symbol];
+}
+
+// Microstructure report for one symbol. Computes VPIN, Kyle's Lambda, Amihud
+// ILLIQ, and OFI from the recent bar window and returns a composite toxicity
+// / liquidity score with a narrative interpretation.
+export function getMicrostructure(symbol: Symbol, lookback = 500): MicrostructureReport {
+  const { bars, regimes } = getSeries(symbol);
+  const recent = bars.slice(-lookback);
+  const recentRegimes = regimes.slice(-lookback);
+  const regime = recentRegimes[recentRegimes.length - 1] ?? "calm";
+  return computeMicrostructure(symbol, recent, regime);
+}
+
+// All symbols' microstructure reports (for the dashboard panel).
+export function getAllMicrostructure(lookback = 500): MicrostructureReport[] {
+  return SYMBOLS.map((s) => getMicrostructure(s, lookback));
 }
