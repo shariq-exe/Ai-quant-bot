@@ -101,6 +101,67 @@ async function fetchJson<T>(url: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+// --- Microstructure types (mirror src/lib/quant/microstructure.ts) ---
+
+export interface VPINResult {
+  vpin: number;
+  rollingMean: number;
+  rollingStd: number;
+  zScore: number;
+  toxicityFlag: boolean;
+  bucketCount: number;
+  series: { time: number; vpin: number }[];
+}
+
+export interface KyleLambdaResult {
+  lambda: number;
+  rollingLambda: number;
+  mean: number;
+  std: number;
+  zScore: number;
+  trend: "rising" | "falling" | "stable";
+  series: { time: number; lambda: number }[];
+}
+
+export interface AmihudResult {
+  illiq: number;
+  mean: number;
+  std: number;
+  zScore: number;
+  percentile: number;
+  series: { time: number; illiq: number }[];
+}
+
+export interface OFIResult {
+  cumulativeDelta: number;
+  deltaSeries: { time: number; delta: number; cumDelta: number; price: number }[];
+  divergence: "bullish" | "bearish" | "none";
+  divergenceStrength: number;
+  priceTrend: "up" | "down" | "flat";
+  deltaTrend: "up" | "down" | "flat";
+}
+
+export interface MicrostructureReport {
+  symbol: Symbol;
+  vpin: VPINResult;
+  kyleLambda: KyleLambdaResult;
+  amihud: AmihudResult;
+  ofi: OFIResult;
+  toxicity: number;
+  toxicityLabel: "calm" | "elevated" | "toxic" | "extreme";
+  liquidity: number;
+  liquidityLabel: "thin" | "normal" | "deep";
+  interpretation: string;
+  regime: string;
+  timestamp: number;
+}
+
+export interface MicrostructureResponse {
+  reports: MicrostructureReport[];
+  count: number;
+  generatedAt: string;
+}
+
 export const api = {
   strategies: () => fetchJson<StrategiesResponse>("/api/strategies"),
   signals: () => fetchJson<SignalsResponse>("/api/signals"),
@@ -110,4 +171,5 @@ export const api = {
     fetchJson<BacktestResponse>(
       `/api/backtest?code=${encodeURIComponent(code)}&symbol=${encodeURIComponent(symbol)}`
     ),
+  microstructure: () => fetchJson<MicrostructureResponse>("/api/microstructure"),
 };

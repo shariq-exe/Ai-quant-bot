@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Activity, Radio, Database, Cpu, RefreshCw, AlertCircle } from "lucide-react";
+import { Activity, Radio, Database, Cpu, RefreshCw, AlertCircle, Microscope } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,12 +11,14 @@ import { StrategyTable } from "./strategy-table";
 import { EquityChart } from "./equity-chart";
 import { PriceTicker } from "./price-ticker";
 import { StatsPanel } from "./stats-panel";
+import { MicrostructurePanel } from "./microstructure-panel";
 import { api } from "@/lib/api";
 import type {
   StrategiesResponse,
   SignalsResponse,
   MarketDataResponse,
   BacktestResponse,
+  MicrostructureResponse,
 } from "@/lib/api";
 import type { Symbol } from "@/lib/quant/types";
 import { SYMBOL_CONFIG } from "@/lib/quant/market-data";
@@ -29,6 +31,7 @@ export function Dashboard() {
   const [eur, setEur] = useState<MarketDataResponse | null>(null);
   const [xau, setXau] = useState<MarketDataResponse | null>(null);
   const [backtest, setBacktest] = useState<BacktestResponse | null>(null);
+  const [micro, setMicro] = useState<MicrostructureResponse | null>(null);
   const [selected, setSelected] = useState<{ code: string; symbol: Symbol }>({
     code: "decay-mom",
     symbol: "EUR/USD",
@@ -38,16 +41,18 @@ export function Dashboard() {
 
   const loadAll = useCallback(async () => {
     try {
-      const [s, sig, e, x] = await Promise.all([
+      const [s, sig, e, x, m] = await Promise.all([
         api.strategies(),
         api.signals(),
         api.marketData("EUR/USD", 200),
         api.marketData("XAU/USD", 200),
+        api.microstructure(),
       ]);
       setStrategies(s);
       setSignals(sig);
       setEur(e);
       setXau(x);
+      setMicro(m);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -75,18 +80,20 @@ export function Dashboard() {
     loadBacktest(selected.code, selected.symbol);
   }, [selected, loadBacktest]);
 
-  // Poll signals + tickers (cheap) every POLL_MS so the "live" feel is real.
+  // Poll signals + tickers + microstructure (cheap) every POLL_MS so the "live" feel is real.
   useEffect(() => {
     const id = setInterval(async () => {
       try {
-        const [sig, e, x] = await Promise.all([
+        const [sig, e, x, m] = await Promise.all([
           api.signals(),
           api.marketData("EUR/USD", 200),
           api.marketData("XAU/USD", 200),
+          api.microstructure(),
         ]);
         setSignals(sig);
         setEur(e);
         setXau(x);
+        setMicro(m);
       } catch {
         // silent on poll failures; real errors surface on full reload
       }
@@ -172,6 +179,29 @@ export function Dashboard() {
             <TradingViewChart symbol={SYMBOL_CONFIG["XAU/USD"].tvSymbol} height={400} />
           </Card>
         </div>
+
+        {/* Row 2.5: microstructure intelligence */}
+        <section>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-xs uppercase tracking-wider text-slate-400 font-medium flex items-center gap-2">
+              <Microscope className="h-3.5 w-3.5 text-amber-400" />
+              Market Microstructure Intelligence
+            </h2>
+            <span className="text-[10px] text-slate-600 font-mono">
+              VPIN · Kyle λ · Amihud ILLIQ · OFI
+              {micro ? ` · updated ${new Date(micro.generatedAt).toLocaleTimeString()}` : " · loading…"}
+            </span>
+          </div>
+          {micro ? (
+            <MicrostructurePanel reports={micro.reports} />
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <Skeleton key={i} className="h-[340px] bg-slate-800/50" />
+              ))}
+            </div>
+          )}
+        </section>
 
         {/* Row 3: live signals */}
         <section>
