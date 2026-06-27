@@ -12,6 +12,8 @@ import type { MicrostructureReport } from "./microstructure";
 import { computeVolatility } from "./volatility";
 import type { VolatilityReport } from "./volatility";
 import type { StrategyDispatch, SymbolDispatch } from "./types";
+import { computeFractal } from "./fractal";
+import type { FractalReport } from "./fractal";
 
 // 1-hour bars over ~11 years → ~96k bars per symbol. Long enough that validated
 // strategies accumulate >1000 trades at their proper (non-overfit) thresholds.
@@ -235,4 +237,17 @@ export function getVolatility(symbol: Symbol, lookback = 500): VolatilityReport 
 // All symbols' volatility reports (for the dashboard panel).
 export function getAllVolatility(lookback = 500): VolatilityReport[] {
   return SYMBOLS.map((s) => getVolatility(s, lookback));
+}
+
+// Fractal geometry report for one symbol: multi-timeframe Hurst (R/S + DFA),
+// MF-DFA spectrum, Higuchi fractal dimension, composite dispatch + trade gate.
+export function getFractal(symbol: Symbol, lookback = 500): FractalReport {
+  const { bars } = getSeries(symbol);
+  const recent = bars.slice(-lookback);
+  return computeFractal(symbol, recent);
+}
+
+// All symbols' fractal reports (for the dashboard panel).
+export function getAllFractal(lookback = 500): FractalReport[] {
+  return SYMBOLS.map((s) => getFractal(s, lookback));
 }

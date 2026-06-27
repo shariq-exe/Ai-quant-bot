@@ -5,6 +5,69 @@ export type Symbol = "EUR/USD" | "XAU/USD";
 
 export type Regime = "trend" | "revert" | "highvol" | "calm";
 
+// --- Fractal geometry & long-memory analysis (Phase 1.3) ---
+
+// Hurst exponent interpretation:
+//   H > 0.5  → persistent (trending) → momentum
+//   H ≈ 0.5  → random walk → reduce exposure
+//   H < 0.5  → anti-persistent (mean-reverting) → mean-reversion
+export type HurstRegime = "persistent" | "random-walk" | "anti-persistent";
+
+export interface HurstResult {
+  value: number; // H estimate
+  method: "R/S" | "DFA";
+  regime: HurstRegime;
+  // Fit quality: log-log regression R² of (log τ, log statistic)
+  rSquared: number;
+}
+
+export interface TimeframeHurst {
+  timeframe: string; // "1H", "4H", "1D"
+  barsPerWindow: number;
+  rs: HurstResult;
+  dfa: HurstResult;
+  // Dislocation: how far this timeframe's average H diverges from the 1H baseline
+  dislocation: number;
+}
+
+export interface MFDAResult {
+  // Spectrum h(q) for moment orders q ∈ [-4, 4]
+  qValues: number[];
+  hValues: number[]; // generalized Hurst exponents
+  // Multifractal width Δh = h_max - h_min (market complexity)
+  deltaH: number;
+  // Spectral classification
+  complexity: "simple" | "moderate" | "complex";
+  // h(2) — the standard DFA Hurst value (q=2)
+  h2: number;
+}
+
+export interface HiguchiResult {
+  dimension: number; // D_H ∈ [1, 2]
+  // 1.0 = trending, 2.0 = noise. Signal quality from the spec.
+  signalQuality: "high" | "medium" | "low";
+  rSquared: number;
+}
+
+export interface FractalReport {
+  symbol: Symbol;
+  // Multi-timeframe Hurst (R/S + DFA per timeframe)
+  timeframes: TimeframeHurst[];
+  // Largest cross-timeframe dislocation (exploitable per spec)
+  maxDislocation: number;
+  dislocationTimeframes: string; // e.g. "1H vs 1D"
+  // Multifractal spectrum
+  mfdfa: MFDAResult;
+  // Higuchi fractal dimension (signal-quality filter)
+  higuchi: HiguchiResult;
+  // Composite: which strategy family does fractal analysis endorse?
+  dispatch: "momentum" | "mean-reversion" | "reduce-exposure";
+  dispatchRationale: string;
+  // Signal-quality gate: only trade when Higuchi confirms the regime
+  tradeGate: "open" | "caution" | "closed";
+  timestamp: number;
+}
+
 // --- Volatility intelligence (Phase 1.2) ---
 
 // Markov-switching GARCH regimes (3-state volatility model).
