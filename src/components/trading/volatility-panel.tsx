@@ -46,7 +46,7 @@ const REGIME_LABEL: Record<VolRegime, string> = {
 const DISPATCH_META: Record<StrategyDispatch, { icon: React.ElementType; color: string; label: string }> = {
   "mean-reversion": { icon: Minus, color: "#34d399", label: "MEAN-REVERSION" },
   "breakout-prep": { icon: Crosshair, color: "#fbbf24", label: "BREAKOUT-PREP" },
-  momentum: { icon: TrendingUp, color: "#60a5fa", label: "MOMENTUM" },
+  momentum: { icon: TrendingUp, color: "#a78bfa", label: "MOMENTUM" },
 };
 
 export function VolatilityPanel({ reports }: VolatilityPanelProps) {

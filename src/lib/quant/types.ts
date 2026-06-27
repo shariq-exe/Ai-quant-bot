@@ -182,4 +182,23 @@ export interface LiveSignal {
   rationale: string;
   indicators: Record<string, number>;
   timestamp: number;
+  // --- Regime-aware dispatch (Phase 1.2 master switch) ---
+  // The HMM-derived dispatch family active for this symbol right now.
+  dispatch: StrategyDispatch;
+  // Whether this strategy's type matches the active dispatch family.
+  // Carry strategies are always eligible (structural harvest, regime-agnostic).
+  regimeActive: boolean;
+  // Human-readable reason for the active/inactive classification.
+  regimeNote: string;
+}
+
+// Per-symbol dispatch context returned alongside live signals so the dashboard
+// can show the master-switch state next to the signal grid.
+export interface SymbolDispatch {
+  symbol: Symbol;
+  dispatch: StrategyDispatch;
+  regimeLabel: string; // HMM state label
+  regimeProbability: number;
+  volRegime: VolRegime;
+  rationale: string;
 }

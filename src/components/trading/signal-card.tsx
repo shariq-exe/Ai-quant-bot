@@ -2,7 +2,7 @@
 
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, Minus, Zap, PowerOff } from "lucide-react";
 import type { LiveSignal } from "@/lib/quant/types";
 
 interface SignalCardProps {
@@ -33,18 +33,33 @@ export function SignalCard({ signal }: SignalCardProps) {
       : "bg-slate-500/10 border-slate-500/30";
 
   const decimals = signal.symbol === "EUR/USD" ? 5 : 2;
+  const active = signal.regimeActive;
+  // Suppressed signals are dimmed + ringed; active signals get an amber accent
+  // ring + a small "ACTIVE" pip so the master-switch endorsement is visible.
+  const cardClass = active
+    ? `${dirBg} ring-1 ring-amber-400/40`
+    : `${dirBg} opacity-45 saturate-50`;
 
   return (
-    <Card className={`border ${dirBg} p-4 flex flex-col gap-2`}>
+    <Card className={`border ${cardClass} p-4 flex flex-col gap-2 transition-opacity`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="font-mono text-sm font-semibold text-slate-100">
               {signal.symbol}
             </span>
             <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 border-slate-600 text-slate-400">
               {TYPE_LABELS[signal.strategyType] ?? signal.strategyType}
             </Badge>
+            {active ? (
+              <Badge className="text-[9px] py-0 px-1 h-4 gap-0.5 bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/20">
+                <Zap className="h-2.5 w-2.5" /> ACTIVE
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-[9px] py-0 px-1 h-4 gap-0.5 border-slate-700 text-slate-500">
+                <PowerOff className="h-2.5 w-2.5" /> SUPPRESSED
+              </Badge>
+            )}
           </div>
           <div className="text-[11px] text-slate-500 mt-0.5 truncate" title={signal.strategyName}>
             {signal.strategyName}
@@ -70,6 +85,11 @@ export function SignalCard({ signal }: SignalCardProps) {
 
       <p className="text-[11px] leading-snug text-slate-400 line-clamp-2" title={signal.rationale}>
         {signal.rationale}
+      </p>
+
+      {/* Regime note — explains why this signal is active or suppressed */}
+      <p className="text-[9px] font-mono text-slate-500 italic" title={signal.regimeNote}>
+        {signal.regimeNote}
       </p>
 
       {Object.keys(signal.indicators).length > 0 && (

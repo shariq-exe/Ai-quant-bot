@@ -1,7 +1,7 @@
 // Frontend API client — typed fetch helpers for the quant endpoints.
 // All requests use relative paths (sandbox-safe; no hardcoded ports).
 
-import type { BacktestStats, LiveSignal, Symbol } from "@/lib/quant/types";
+import type { BacktestStats, LiveSignal, Symbol, StrategyDispatch, SymbolDispatch } from "@/lib/quant/types";
 
 export interface StrategyInfo {
   code: string;
@@ -28,9 +28,13 @@ export interface StrategiesResponse {
 
 export interface SignalsResponse {
   signals: LiveSignal[];
+  dispatch: SymbolDispatch[];
   count: number;
   generatedAt: string;
 }
+
+// Re-export the dispatch types for convenience in components.
+export type { StrategyDispatch, SymbolDispatch };
 
 export interface Bar {
   time: number;

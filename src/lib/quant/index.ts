@@ -11,6 +11,7 @@ import { computeMicrostructure } from "./microstructure";
 import type { MicrostructureReport } from "./microstructure";
 import { computeVolatility } from "./volatility";
 import type { VolatilityReport } from "./volatility";
+import type { StrategyDispatch, SymbolDispatch } from "./types";
 
 // 1-hour bars over ~11 years → ~96k bars per symbol. Long enough that validated
 // strategies accumulate >1000 trades at their proper (non-overfit) thresholds.
@@ -121,20 +122,60 @@ export function getBacktestSuite(): StrategySummary[] {
   return out;
 }
 
+// Map a strategy type to the dispatch family it belongs to.
+// Carry is regime-agnostic (structural harvest) → always eligible.
+const STRATEGY_DISPATCH: Record<string, StrategyDispatch | "always"> = {
+  "mean-reversion": "mean-reversion",
+  momentum: "momentum",
+  breakout: "breakout-prep",
+  carry: "always",
+};
+
+// Compute the per-symbol dispatch context (HMM master switch state).
+export function getDispatchContext(): SymbolDispatch[] {
+  return SYMBOLS.map((sym) => {
+    const vol = getVolatility(sym, 500);
+    return {
+      symbol: sym,
+      dispatch: vol.dispatch,
+      regimeLabel: vol.hmm.label,
+      regimeProbability: vol.hmm.probability,
+      volRegime: vol.garch.regime,
+      rationale: vol.dispatchRationale,
+    };
+  });
+}
+
 // Generate the current live signal for every strategy × symbol.
-// Uses the latest N bars of the cached series and the strategy's signal fn.
+// Each signal is tagged with the HMM master-switch dispatch for its symbol:
+// regimeActive = true when the strategy's type matches the active dispatch
+// family (or it's a regime-agnostic carry strategy). This is the wiring that
+// turns the HMM into the "master switch that determines which sub-strategies
+// are active" per the Phase 1.2 spec.
 export function getLiveSignals(): LiveSignal[] {
   const out: LiveSignal[] = [];
   const lookback = 200;
+  // Precompute dispatch per symbol so we don't recompute the HMM per strategy.
+  const dispatchBySymbol = new Map<Symbol, SymbolDispatch>();
+  for (const d of getDispatchContext()) dispatchBySymbol.set(d.symbol, d);
+
   for (const strat of STRATEGIES) {
     for (const sym of SYMBOLS) {
       const { bars } = getSeries(sym);
       if (bars.length < lookback + 5) continue;
-      // Evaluate on the most recent bar.
       const idx = bars.length - 1;
       const res = strat.signal({ bars, idx, position: null });
       const direction: LiveSignal["direction"] =
         res.action === "enter-long" ? "long" : res.action === "enter-short" ? "short" : "flat";
+      const ctx = dispatchBySymbol.get(sym);
+      const family = STRATEGY_DISPATCH[strat.type] ?? "always";
+      const regimeActive =
+        family === "always" || family === ctx?.dispatch;
+      const regimeNote = regimeActive
+        ? family === "always"
+          ? "carry · regime-agnostic"
+          : `matches ${ctx?.dispatch} regime`
+        : `suppressed — ${ctx?.dispatch} regime active`;
       out.push({
         strategyCode: strat.code,
         strategyName: strat.name,
@@ -146,6 +187,9 @@ export function getLiveSignals(): LiveSignal[] {
         rationale: res.rationale,
         indicators: res.indicators ?? {},
         timestamp: bars[idx].time,
+        dispatch: ctx?.dispatch ?? "mean-reversion",
+        regimeActive,
+        regimeNote,
       });
     }
   }

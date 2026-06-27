@@ -35,6 +35,7 @@ export function Dashboard() {
   const [backtest, setBacktest] = useState<BacktestResponse | null>(null);
   const [micro, setMicro] = useState<MicrostructureResponse | null>(null);
   const [vol, setVol] = useState<VolatilityResponse | null>(null);
+  const [regimeOnly, setRegimeOnly] = useState(false);
   const [selected, setSelected] = useState<{ code: string; symbol: Symbol }>({
     code: "decay-mom",
     symbol: "EUR/USD",
@@ -233,27 +234,73 @@ export function Dashboard() {
           )}
         </section>
 
-        {/* Row 3: live signals */}
+        {/* Row 3: live signals (regime-aware via HMM master switch) */}
         <section>
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
             <h2 className="text-xs uppercase tracking-wider text-slate-400 font-medium flex items-center gap-2">
               <Radio className="h-3.5 w-3.5 text-emerald-400" />
               Live Signals
+              <span className="text-[10px] font-normal text-slate-600 normal-case tracking-normal">
+                · HMM master-switch gated
+              </span>
             </h2>
-            <span className="text-[10px] text-slate-600 font-mono">
-              {signals ? `updated ${new Date(signals.generatedAt).toLocaleTimeString()}` : "loading…"}
-            </span>
+            <div className="flex items-center gap-3">
+              {signals?.dispatch && signals.dispatch.length > 0 && (
+                <div className="hidden sm:flex items-center gap-2 text-[10px] font-mono">
+                  {signals.dispatch.map((d) => (
+                    <span key={d.symbol} className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-800/60 border border-slate-700/40">
+                      <span className="text-slate-400">{d.symbol}</span>
+                      <span className={
+                        d.dispatch === "mean-reversion" ? "text-emerald-400" :
+                        d.dispatch === "momentum" ? "text-violet-400" : "text-amber-400"
+                      }>
+                        {d.dispatch.toUpperCase()}
+                      </span>
+                      <span className="text-slate-600">p={d.regimeProbability.toFixed(2)}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => setRegimeOnly((v) => !v)}
+                className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors ${
+                  regimeOnly
+                    ? "bg-amber-500/20 border-amber-500/50 text-amber-300"
+                    : "bg-slate-800/40 border-slate-700 text-slate-400 hover:border-slate-600"
+                }`}
+                title="Show only signals whose strategy type matches the active HMM regime"
+              >
+                {regimeOnly ? "✓ REGIME-ACTIVE ONLY" : "regime filter"}
+              </button>
+              <span className="text-[10px] text-slate-600 font-mono">
+                {signals ? `updated ${new Date(signals.generatedAt).toLocaleTimeString()}` : "loading…"}
+              </span>
+            </div>
           </div>
           {signals ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {signals.signals.map((sig) => (
-                <SignalCard key={`${sig.strategyCode}-${sig.symbol}`} signal={sig} />
-              ))}
-            </div>
+            (() => {
+              const visible = regimeOnly
+                ? signals.signals.filter((s) => s.regimeActive)
+                : signals.signals;
+              if (visible.length === 0) {
+                return (
+                  <div className="text-center py-8 text-[11px] text-slate-500 font-mono border border-dashed border-slate-800 rounded-lg">
+                    no regime-active signals — HMM dispatch suppresses all strategy types this tick
+                  </div>
+                );
+              }
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {visible.map((sig) => (
+                    <SignalCard key={`${sig.strategyCode}-${sig.symbol}`} signal={sig} />
+                  ))}
+                </div>
+              );
+            })()
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {Array.from({ length: 8 }).map((_, i) => (
-                <Skeleton key={i} className="h-[140px] bg-slate-800/50" />
+                <Skeleton key={i} className="h-[160px] bg-slate-800/50" />
               ))}
             </div>
           )}
