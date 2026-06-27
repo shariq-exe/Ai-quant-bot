@@ -328,6 +328,13 @@ export interface LiveSignal {
   // When this drops below 0.15, an active signal is downgraded to HOLD
   // (the spec's "eliminate exposure" in the high-PE random regime).
   effectiveConfidence: number;
+  // --- Cross-asset edge (Phase 1.4 Transfer Entropy) ---
+  // True when this signal was injected by a TE cross-asset edge (not a regular
+  // strategy). The spec: "When TE(XAU→EUR) spikes, use gold signals to predict
+  // EUR/USD moves." These signals fire only when the directed TE z-score > 2.
+  isCrossAsset: boolean;
+  // The leading asset + direction that triggered this edge signal.
+  edgeSource?: string; // e.g. "XAU rising" or "EUR falling"
 }
 
 // Per-symbol dispatch context returned alongside live signals so the dashboard

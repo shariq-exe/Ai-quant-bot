@@ -14,6 +14,7 @@ const TYPE_LABELS: Record<string, string> = {
   momentum: "Momentum",
   breakout: "Breakout",
   carry: "Carry",
+  "cross-asset": "Cross-Asset TE",
 };
 
 export function SignalCard({ signal }: SignalCardProps) {
@@ -41,7 +42,9 @@ export function SignalCard({ signal }: SignalCardProps) {
   //   suppressed — dimmed, ⏻ SUPPRESSED badge
   const cardClass =
     status === "active"
-      ? `${dirBg} ring-1 ring-amber-400/40`
+      ? signal.isCrossAsset
+        ? `${dirBg} ring-1 ring-fuchsia-400/50` // cross-asset edge gets a fuchsia ring
+        : `${dirBg} ring-1 ring-amber-400/40`
       : status === "hold"
       ? `${dirBg} ring-1 ring-amber-500/30 ring-dashed opacity-70`
       : `${dirBg} opacity-40 saturate-50`;

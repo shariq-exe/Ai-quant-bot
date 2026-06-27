@@ -239,9 +239,79 @@ export function getLiveSignals(): LiveSignal[] {
         peSizingMultiplier: pe.multiplier,
         peState: pe.state,
         effectiveConfidence,
+        isCrossAsset: false,
       });
     }
   }
+
+  // --- Cross-asset edge signal injection (Phase 1.4 Transfer Entropy) ---
+  // Per spec: "When TE(XAU→EUR) spikes, use gold signals to predict EUR/USD moves."
+  // When the directed TE z-score > 2, inject a synthetic signal for the lagging
+  // asset based on the leading asset's recent direction. This is the "massive
+  // edge that retail traders completely miss." The signal carries confidence
+  // proportional to the spike z-score and goes through the same PE sizing +
+  // fractal gate pipeline as regular signals.
+  if (info.crossAssetEdge !== "none") {
+    const edge = info.crossAssetEdge;
+    const isXauLeadsEur = edge.startsWith("xau-leads-eur");
+    const isLong = edge.includes("long");
+    const targetSymbol: Symbol = isXauLeadsEur ? "EUR/USD" : "XAU/USD";
+    const leaderSymbol: Symbol = isXauLeadsEur ? "XAU/USD" : "EUR/USD";
+    const leaderBars = getSeries(leaderSymbol).bars;
+    const leaderRet = leaderBars.length > 1
+      ? Math.log(leaderBars[leaderBars.length - 1].close / leaderBars[leaderBars.length - 2].close)
+      : 0;
+    const targetBars = getSeries(targetSymbol).bars;
+    const targetIdx = targetBars.length - 1;
+    const targetPe = peBySymbol.get(targetSymbol) ?? { multiplier: 1, state: "normal" as const };
+    const targetFract = fractalBySymbol.get(targetSymbol);
+    const targetFractalGate = targetFract?.tradeGate ?? "caution";
+    // Confidence from the TE spike z-score (z>2 → confidence 0.5–1.0).
+    const zConfidence = Math.min(1, Math.max(0.5, (info.transferEntropy.spikeZScore - 1) / 3));
+    const effConf = zConfidence * targetPe.multiplier;
+    // Cross-asset signals bypass the HMM dispatch (they're regime-agnostic edge
+    // captures) but still respect the fractal gate + PE sizing.
+    let edgeStatus: LiveSignal["signalStatus"];
+    let edgeNote: string;
+    if (targetFractalGate === "closed") {
+      edgeStatus = "hold";
+      edgeNote = `TE edge · fractal gate CLOSED for ${targetSymbol}`;
+    } else if (targetPe.state === "random" && effConf < 0.15) {
+      edgeStatus = "hold";
+      edgeNote = `TE edge · PE random → exposure eliminated`;
+    } else {
+      edgeStatus = "active";
+      edgeNote = `TE spike z=${info.transferEntropy.spikeZScore.toFixed(2)} · ${leaderSymbol} ${leaderRet >= 0 ? "rising" : "falling"} → ${targetSymbol} ${isLong ? "long" : "short"}`;
+    }
+    out.push({
+      strategyCode: "cross-asset-te",
+      strategyName: "Cross-Asset Transfer Entropy Edge",
+      strategyType: "cross-asset",
+      symbol: targetSymbol,
+      direction: isLong ? "long" : "short",
+      confidence: zConfidence,
+      price: targetBars[targetIdx]?.close ?? 0,
+      rationale: info.edgeRationale,
+      indicators: {
+        teZ: info.transferEntropy.spikeZScore,
+        netTE: info.transferEntropy.netTE,
+        leaderReturn: leaderRet,
+      },
+      timestamp: targetBars[targetIdx]?.time ?? Date.now(),
+      dispatch: "mean-reversion", // not applicable but required by type
+      regimeActive: true, // cross-asset edges bypass HMM dispatch
+      regimeNote: "cross-asset edge · HMM bypass",
+      fractalGate: targetFractalGate,
+      signalStatus: edgeStatus,
+      statusNote: edgeNote,
+      peSizingMultiplier: targetPe.multiplier,
+      peState: targetPe.state,
+      effectiveConfidence: effConf,
+      isCrossAsset: true,
+      edgeSource: `${leaderSymbol} ${leaderRet >= 0 ? "rising" : "falling"}`,
+    });
+  }
+
   return out;
 }
 
