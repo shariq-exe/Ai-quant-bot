@@ -1,8 +1,8 @@
 # PROJECT_MEMORY.md
 
-last_updated: 2026-06-27 11:18 Asia/Calcutta
-turn_count: 17
-last_commit: aac8dea (G24 MF-DFA complexity modulates gate) — PUSHED to GitHub
+last_updated: 2026-06-27 14:35 Asia/Calcutta
+turn_count: 19
+last_commit: 28b6308 (G26-G28 information theory + PE sizing) — PUSHED to GitHub
 
 ## CAPABILITY CHECK
 file_io: yes | terminal: yes | git: yes | network: yes
@@ -76,7 +76,14 @@ Next.js 16.1.3 (App Router, Turbopack) + React 19 + TS 5 + Tailwind 4 + shadcn/u
 - [x] G25 — Agent Browser verify — VERIFIED (Δh gauge renders with threshold zones, modulation status text "moderate complexity" shown, 3-state badges still ACTIVE=2/HOLD=2/SUPPRESSED=4, 7 sections, no errors, footer sticky)
 - [x] G5 — Final regression pass — CLEAN (7 endpoints 200, 3/8 VALID, lint clean, pushed 488e6c8..aac8dea)
 
-**ALL GOALS VERIFIED.** Phase 1.1 + 1.2 + 1.3 complete, MF-DFA confidence modulation wired to gate. Pushed to GitHub (aac8dea). Awaiting next phase file.
+**Phase 1.4 information theory & causality detection:**
+- [x] G26 — Information-theory library: Transfer Entropy (exact Schreiber formula, XAU↔EUR directed, rolling-window spike z-score), Permutation Entropy (Bandt-Pompe, rolling percentile → predictable/random state + sizing multiplier ×1.25/×0.5), Mutual Information (non-linear feature ranking vs future returns, bins=5). Composite cross-asset edge signal. — VERIFIED, commit 8e38490. Real output: TE(XAU→EUR)=0.011 bits, EUR/USD PE=0.974 (predictable, ×1.25), XAU/USD PE=0.976 (random, ×0.5), MI top=volume (0.081 bits).
+- [x] G27 — /api/information endpoint + InformationPanel (TE direction gauge + dual sparkline, PE predictability band per symbol, MI horizontal bar chart with 0.05-bit threshold, cross-asset edge banner) — VERIFIED, commit f64c9de
+- [x] G28 — Wire PE predictability into signal sizing: effectiveConfidence = confidence × peSizingMultiplier. Active signals with PE random + eff<0.15 downgraded to HOLD (spec: "eliminate exposure"). SignalCard shows PE badge + effective confidence arrow. — VERIFIED, commit 28b6308. Real output: XAU/USD vol-breakout + carry-proxy downgraded ACTIVE→HOLD ("PE random (×0.5) → exposure eliminated").
+- [x] G29 — Agent Browser verify — VERIFIED (8 sections render incl "Information Theory & Causality Detection", TE/PE/MI panels render real data, PE badges on signals, "exposure eliminated" visible, no errors, footer sticky)
+- [x] G5 — Final regression pass — CLEAN (8 endpoints 200, 3/8 VALID, lint clean, pushed aac8dea..28b6308)
+
+**ALL GOALS VERIFIED.** Phase 1.1 + 1.2 + 1.3 + 1.4 complete, PE sizing wired to execution. Pushed to GitHub (28b6308). Awaiting next phase file.
 
 ## NEWLY DISCOVERED
 - SECURITY: user shared a GitHub PAT in plaintext in chat. Token was used one-shot (not written to .git/config). **User should rotate this token at https://github.com/settings/tokens — it is now exposed in the chat history.**
@@ -98,6 +105,8 @@ Next.js 16.1.3 (App Router, Turbopack) + React 19 + TS 5 + Tailwind 4 + shadcn/u
 - Quant engine caches series per symbol (96k bars, deterministic seeds) + 5-min TTL on backtest suite cache. Microstructure ~55ms, volatility ~85ms per symbol (fresh each call).
 - 3 validated strategies: decay-mom EUR/USD (Sharpe 3.70, p=0.0019, 1155 trades), carry-proxy EUR/USD (Sharpe 3.57, p=0.0003, 1719 trades), carry-proxy XAU/USD (Sharpe 3.60, p=0.0003, 1645 trades).
 - Agent Browser session open; viewport 1280×900. Screenshots in /home/z/my-project/upload/.
-- Phase 1 file sections done: 1.1 (microstructure) + 1.2 (volatility intelligence) + 1.3 (fractal geometry). User may send 1.4+.
+- Phase 1 file sections done: 1.1 (microstructure) + 1.2 (volatility intelligence) + 1.3 (fractal geometry) + 1.4 (information theory). User may send 1.5+.
 - examples/websocket/ has a socket.io demo for any future real-time feature.
-- GitHub: https://github.com/shariq-exe/Ai-quant-bot (main branch, HEAD aac8dea).
+- GitHub: https://github.com/shariq-exe/Ai-quant-bot (main branch, HEAD 28b6308).
+- Execution pipeline now has 4 layered confidence controls: HMM master switch (regime match) → Higuchi confirmation (signal quality) → MF-DFA modulation (complexity reduction) → PE sizing (predictability multiplier). All 4 must pass for a signal to be fully ACTIVE.
+- 8 API endpoints: /api/strategies, signals, market-data, backtest, microstructure, volatility, fractal, information. All return 200.
