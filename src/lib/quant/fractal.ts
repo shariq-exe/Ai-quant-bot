@@ -435,15 +435,19 @@ export function computeFractal(symbol: Symbol, bars: Bar[]): FractalReport {
   if (maxDislocation > 0.15) {
     rationale += ` · ⚡ ${dislocationTimeframes} dislocation Δ=${maxDislocation.toFixed(2)} (exploitable)`;
   }
-  if (mf.complexity === "complex") {
-    rationale += ` · MF-DFA Δh=${mf.deltaH.toFixed(2)} (complex — reduce confidence)`;
-  }
+  // (MF-DFA complexity note is appended by the gate-modulation block below.)
 
   // --- Signal-quality trade gate (Higuchi confirms the regime) ---
   // Open: Higuchi confirms trending (D<1.4) when dispatch=momentum, OR confirms
   //       noise (D>1.7) when dispatch=mean-reversion.
   // Caution: Higuchi is ambiguous (1.4 ≤ D ≤ 1.7).
   // Closed: Higuchi contradicts the dispatch (e.g. momentum dispatch but D≈2 noise).
+  //
+  // MF-DFA complexity MODULATES the gate per the spec ("wide spectrum = complex
+  // dynamics, reduce confidence"):
+  //   - complex (Δh > 0.4): downgrade open→caution, keep closed as closed
+  //   - very-complex (Δh > 0.5): force closed regardless of Higuchi
+  //   - simple: no modulation
   let tradeGate: FractalReport["tradeGate"];
   if (dispatch === "reduce-exposure") {
     tradeGate = "closed";
@@ -455,6 +459,22 @@ export function computeFractal(symbol: Symbol, bars: Bar[]): FractalReport {
       (dispatch === "mean-reversion" && hig.dimension > 1.7);
     tradeGate = confirms ? "open" : "closed";
   }
+  // MF-DFA complexity modulation (the spec's "reduce confidence").
+  let complexityNote = "";
+  if (mf.deltaH > 0.5) {
+    // Very wide spectrum → dynamics too complex to trust → force closed.
+    if (tradeGate !== "closed") {
+      complexityNote = ` · MF-DFA Δh=${mf.deltaH.toFixed(2)} >0.5 (very complex) → gate forced CLOSED`;
+    }
+    tradeGate = "closed";
+  } else if (mf.deltaH > 0.4) {
+    // Complex → downgrade any open gate to caution (reduce confidence).
+    if (tradeGate === "open") {
+      complexityNote = ` · MF-DFA Δh=${mf.deltaH.toFixed(2)} (complex) → open downgraded to CAUTION`;
+      tradeGate = "caution";
+    }
+  }
+  if (complexityNote) rationale += complexityNote;
 
   return {
     symbol,

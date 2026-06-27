@@ -261,11 +261,29 @@ export function FractalPanel({ reports }: FractalPanelProps) {
                     {r.mfdfa.complexity}
                   </span>
                 </div>
+                {/* Δh modulation gauge with threshold zones at 0.4 (caution) and 0.5 (closed) */}
+                <div className="relative h-1 rounded-full bg-gradient-to-r from-emerald-500/50 via-amber-500/50 to-rose-500/60">
+                  <div
+                    className="absolute -top-0.5 w-0.5 h-2 bg-slate-100"
+                    style={{ left: `${Math.min((r.mfdfa.deltaH / 0.6) * 100, 100)}%` }}
+                  />
+                  {/* threshold ticks */}
+                  <div className="absolute top-0 h-1 w-px bg-slate-400/60" style={{ left: `${(0.4 / 0.6) * 100}%` }} />
+                  <div className="absolute top-0 h-1 w-px bg-slate-400/60" style={{ left: `${(0.5 / 0.6) * 100}%` }} />
+                </div>
+                <span className="text-[8px] font-mono text-slate-600 flex justify-between">
+                  <span>simple</span>
+                  <span>0.4</span>
+                  <span>0.5</span>
+                  <span>complex</span>
+                </span>
                 <div className="text-[9px] text-slate-500 leading-tight">
-                  {r.mfdfa.complexity === "simple"
+                  {r.mfdfa.deltaH > 0.5
+                    ? "very complex → gate forced CLOSED"
+                    : r.mfdfa.deltaH > 0.4
+                    ? "complex → open downgraded to CAUTION"
+                    : r.mfdfa.complexity === "simple"
                     ? "monofractal — predictable"
-                    : r.mfdfa.complexity === "complex"
-                    ? "multifractal — reduce confidence"
                     : "moderate complexity"}
                 </div>
               </div>
