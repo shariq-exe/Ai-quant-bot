@@ -1,8 +1,8 @@
 # PROJECT_MEMORY.md
 
-last_updated: 2026-06-27 11:02 Asia/Calcutta
-turn_count: 15
-last_commit: 488e6c8 (G22 fractal gate → signal layer) — PUSHED to GitHub
+last_updated: 2026-06-27 11:18 Asia/Calcutta
+turn_count: 17
+last_commit: aac8dea (G24 MF-DFA complexity modulates gate) — PUSHED to GitHub
 
 ## CAPABILITY CHECK
 file_io: yes | terminal: yes | git: yes | network: yes
@@ -71,7 +71,12 @@ Next.js 16.1.3 (App Router, Turbopack) + React 19 + TS 5 + Tailwind 4 + shadcn/u
 - [x] G23 — Agent Browser verify — VERIFIED (3-state badges render: ACTIVE=2/HOLD=2/SUPPRESSED=4, filter toggle works both ways, 7 sections, no errors, footer sticky)
 - [x] G5 — Final regression pass — CLEAN (7 endpoints 200, 3/8 VALID, lint clean, pushed a4895fb..488e6c8)
 
-**ALL GOALS VERIFIED.** Phase 1.1 + 1.2 + 1.3 complete, fractal gate fully wired to execution. Pushed to GitHub (488e6c8). Awaiting next phase file.
+**Phase 1.3 MF-DFA confidence modulation (continued from "where I stopped"):**
+- [x] G24 — MF-DFA complexity modulates fractal trade-gate per spec ("wide spectrum = complex dynamics, reduce confidence"): complex (Δh>0.4) downgrades open→caution, very-complex (Δh>0.5) forces closed. Logic unit-tested across all 6 branches. FractalPanel Δh gauge shows 0.4/0.5 threshold zones + modulation status text. — VERIFIED, commit aac8dea. Note: synthetic data's Δh maxes at ~0.23 (more monofractal than real FX), so modulation doesn't fire on current data but will on real market data where Δh∈[0.3,0.8].
+- [x] G25 — Agent Browser verify — VERIFIED (Δh gauge renders with threshold zones, modulation status text "moderate complexity" shown, 3-state badges still ACTIVE=2/HOLD=2/SUPPRESSED=4, 7 sections, no errors, footer sticky)
+- [x] G5 — Final regression pass — CLEAN (7 endpoints 200, 3/8 VALID, lint clean, pushed 488e6c8..aac8dea)
+
+**ALL GOALS VERIFIED.** Phase 1.1 + 1.2 + 1.3 complete, MF-DFA confidence modulation wired to gate. Pushed to GitHub (aac8dea). Awaiting next phase file.
 
 ## NEWLY DISCOVERED
 - SECURITY: user shared a GitHub PAT in plaintext in chat. Token was used one-shot (not written to .git/config). **User should rotate this token at https://github.com/settings/tokens — it is now exposed in the chat history.**
@@ -95,4 +100,4 @@ Next.js 16.1.3 (App Router, Turbopack) + React 19 + TS 5 + Tailwind 4 + shadcn/u
 - Agent Browser session open; viewport 1280×900. Screenshots in /home/z/my-project/upload/.
 - Phase 1 file sections done: 1.1 (microstructure) + 1.2 (volatility intelligence) + 1.3 (fractal geometry). User may send 1.4+.
 - examples/websocket/ has a socket.io demo for any future real-time feature.
-- GitHub: https://github.com/shariq-exe/Ai-quant-bot (main branch, HEAD 488e6c8).
+- GitHub: https://github.com/shariq-exe/Ai-quant-bot (main branch, HEAD aac8dea).
