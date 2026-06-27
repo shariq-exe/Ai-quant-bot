@@ -1,8 +1,8 @@
 # PROJECT_MEMORY.md
 
-last_updated: 2026-06-27 09:48 Asia/Calcutta
-turn_count: 9
-last_commit: d5e1fbc (G15 HMM master switch → live signals) — PUSHED to GitHub
+last_updated: 2026-06-27 10:12 Asia/Calcutta
+turn_count: 11
+last_commit: 209ff6b (G17+G18 multivariate HMM) — PUSHED to GitHub
 
 ## CAPABILITY CHECK
 file_io: yes | terminal: yes | git: yes | network: yes
@@ -55,7 +55,12 @@ Next.js 16.1.3 (App Router, Turbopack) + React 19 + TS 5 + Tailwind 4 + shadcn/u
 - [x] G16 — Agent Browser verify regime-aware signals — VERIFIED (ACTIVE/SUPPRESSED badges render, filter toggle works both ways: ON→only active visible, OFF→all 8 back, no errors, 6 sections intact, footer sticky)
 - [x] G5 — Final regression pass — CLEAN (6 endpoints 200, lint clean, 3/8 VALID, pushed e8ad97b..d5e1fbc)
 
-**ALL GOALS VERIFIED.** Phase 1.1 + 1.2 complete, HMM master switch fully wired to execution layer. Pushed to GitHub (d5e1fbc). Awaiting next phase file.
+**Phase 1.2 spec-compliance (continued from "where I stopped"):**
+- [x] G17 — Upgrade HMM to multivariate: 4 features (log-returns, realized vol, volume skewness, spread proxy) with diagonal-covariance Gaussian emissions. `extractHMMFeatures` standardizes features; Baum-Welch/Viterbi/forward operate on T×4 matrix; states sorted by realized-vol mean. Implements the spec sentence exactly: "Train a Gaussian HMM with 3-4 hidden states using features: log-returns, realized volatility, volume profile skewness, and spread dynamics." — VERIFIED, commit 578c36e
+- [x] G18 — Agent Browser verify multivariate HMM + add feature matrix table to VolatilityPanel (4 features × 3 states + current values, active state column highlighted) — VERIFIED (table renders real values, no errors, regime-gated signals still ACTIVE=4/SUPPRESSED=4, 6 sections, footer sticky), commit 209ff6b
+- [x] G5 — Final regression pass — CLEAN (6 endpoints 200, 3/8 VALID, lint clean, pushed d5e1fbc..209ff6b)
+
+**ALL GOALS VERIFIED.** Phase 1.2 now fully spec-compliant (multivariate HMM + master-switch wiring). Pushed to GitHub (209ff6b). Awaiting next phase file.
 
 ## NEWLY DISCOVERED
 - SECURITY: user shared a GitHub PAT in plaintext in chat. Token was used one-shot (not written to .git/config). **User should rotate this token at https://github.com/settings/tokens — it is now exposed in the chat history.**
@@ -65,6 +70,7 @@ Next.js 16.1.3 (App Router, Turbopack) + React 19 + TS 5 + Tailwind 4 + shadcn/u
 - Forcing z-score-mr valid via threshold loosening — destroys the honest signal. It's legitimately negative after costs on this synthetic data.
 - Per-bar trend drift > baseSigma * 0.2 — causes price collapse/explosion over long runs.
 - Using blue/sky/indigo colors for dispatch families — project constraint forbids blue/indigo. Use emerald (mean-reversion), amber (breakout-prep), violet (momentum) instead. Caught in G15: initially used `text-sky-400`/`#60a5fa` for momentum, fixed to violet `#a78bfa`.
+- Univariate HMM on log-returns only — Phase 1.2 spec explicitly lists 4 features (log-returns, realized vol, volume skewness, spread dynamics). Must use multivariate diagonal-covariance Gaussian emissions. Caught in G17: original HMM was univariate, upgraded to 4-feature.
 
 ## AGENT BROWSER NOTES
 - After `agent-browser reload`, the session sometimes drops to `about:blank`. Use `agent-browser open http://localhost:3000/` + a 8-9s wait to re-establish.
@@ -78,4 +84,4 @@ Next.js 16.1.3 (App Router, Turbopack) + React 19 + TS 5 + Tailwind 4 + shadcn/u
 - Agent Browser session open; viewport 1280×900. Screenshots in /home/z/my-project/upload/.
 - Phase 1 file sections done: 1.1 (microstructure) + 1.2 (volatility intelligence). User may send 1.3+.
 - examples/websocket/ has a socket.io demo for any future real-time feature.
-- GitHub: https://github.com/shariq-exe/Ai-quant-bot (main branch, HEAD e8ad97b).
+- GitHub: https://github.com/shariq-exe/Ai-quant-bot (main branch, HEAD 209ff6b).
