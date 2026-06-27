@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Activity, Radio, Database, Cpu, RefreshCw, AlertCircle, Microscope, Waves, Box, Brain } from "lucide-react";
+import { Activity, Radio, Database, Cpu, RefreshCw, AlertCircle, Microscope, Waves, Box, Brain, GitCompareArrows } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,6 +15,7 @@ import { MicrostructurePanel } from "./microstructure-panel";
 import { VolatilityPanel } from "./volatility-panel";
 import { FractalPanel } from "./fractal-panel";
 import { InformationPanel } from "./information-panel";
+import { StatArbPanel } from "./statarb-panel";
 import { api } from "@/lib/api";
 import type {
   StrategiesResponse,
@@ -25,6 +26,7 @@ import type {
   VolatilityResponse,
   FractalResponse,
   InformationResponse,
+  StatArbResponse,
 } from "@/lib/api";
 import type { Symbol } from "@/lib/quant/types";
 import { SYMBOL_CONFIG } from "@/lib/quant/market-data";
@@ -41,6 +43,7 @@ export function Dashboard() {
   const [vol, setVol] = useState<VolatilityResponse | null>(null);
   const [fractal, setFractal] = useState<FractalResponse | null>(null);
   const [info, setInfo] = useState<InformationResponse | null>(null);
+  const [statArb, setStatArb] = useState<StatArbResponse | null>(null);
   const [regimeOnly, setRegimeOnly] = useState(false);
   const [selected, setSelected] = useState<{ code: string; symbol: Symbol }>({
     code: "decay-mom",
@@ -51,7 +54,7 @@ export function Dashboard() {
 
   const loadAll = useCallback(async () => {
     try {
-      const [s, sig, e, x, m, v, f, i] = await Promise.all([
+      const [s, sig, e, x, m, v, f, i, sa] = await Promise.all([
         api.strategies(),
         api.signals(),
         api.marketData("EUR/USD", 200),
@@ -60,6 +63,7 @@ export function Dashboard() {
         api.volatility(),
         api.fractal(),
         api.information(),
+        api.statArb(),
       ]);
       setStrategies(s);
       setSignals(sig);
@@ -69,6 +73,7 @@ export function Dashboard() {
       setVol(v);
       setFractal(f);
       setInfo(i);
+      setStatArb(sa);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -100,7 +105,7 @@ export function Dashboard() {
   useEffect(() => {
     const id = setInterval(async () => {
       try {
-        const [sig, e, x, m, v, f, i] = await Promise.all([
+        const [sig, e, x, m, v, f, i, sa] = await Promise.all([
           api.signals(),
           api.marketData("EUR/USD", 200),
           api.marketData("XAU/USD", 200),
@@ -108,6 +113,7 @@ export function Dashboard() {
           api.volatility(),
           api.fractal(),
           api.information(),
+          api.statArb(),
         ]);
         setSignals(sig);
         setEur(e);
@@ -116,6 +122,7 @@ export function Dashboard() {
         setVol(v);
         setFractal(f);
         setInfo(i);
+        setStatArb(sa);
       } catch {
         // silent on poll failures; real errors surface on full reload
       }
@@ -289,6 +296,29 @@ export function Dashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
               {Array.from({ length: 3 }).map((_, i) => (
                 <Skeleton key={i} className="h-[340px] bg-slate-800/50" />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Row 2.9: statistical arbitrage & mean-reversion */}
+        <section>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-xs uppercase tracking-wider text-slate-400 font-medium flex items-center gap-2">
+              <GitCompareArrows className="h-3.5 w-3.5 text-amber-400" />
+              Statistical Arbitrage & Mean-Reversion
+            </h2>
+            <span className="text-[10px] text-slate-600 font-mono">
+              OU Process · Kalman Filter · Cointegration · Half-Life
+              {statArb ? ` · updated ${new Date(statArb.generatedAt).toLocaleTimeString()}` : " · loading…"}
+            </span>
+          </div>
+          {statArb ? (
+            <StatArbPanel report={statArb.report} />
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-[320px] bg-slate-800/50" />
               ))}
             </div>
           )}

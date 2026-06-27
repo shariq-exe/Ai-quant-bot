@@ -327,6 +327,60 @@ export interface InformationResponse {
   generatedAt: string;
 }
 
+// --- Statistical arbitrage types (mirror src/lib/quant/statarb.ts) ---
+
+export interface OUResult {
+  theta: number;
+  mu: number;
+  sigma: number;
+  halfLife: number;
+  currentSpread: number;
+  zScore: number;
+  deviation: number;
+  entrySignal: "long-spread" | "short-spread" | "none";
+  halfLifeValid: boolean;
+  halfLifeNote: string;
+  series: { time: number; spread: number; equilibrium: number; upperBand: number; lowerBand: number }[];
+}
+
+export interface KalmanResult {
+  hedgeRatio: number;
+  hedgeRatioSeries: { time: number; beta: number }[];
+  residual: number;
+  residualMean: number;
+  residualStd: number;
+  residualZScore: number;
+  entrySignal: "long-residual" | "short-residual" | "none";
+  innovationSeries: { time: number; residual: number }[];
+  posteriorVariance: number;
+}
+
+export interface CointegrationResult {
+  isCointegrated: boolean;
+  traceStat: number;
+  criticalValue: number;
+  pValue: number;
+  cointegratingVector: [number, number];
+  note: string;
+}
+
+export interface StatArbReport {
+  symbols: [Symbol, Symbol];
+  spreadLabel: string;
+  ou: OUResult;
+  kalman: KalmanResult;
+  cointegration: CointegrationResult;
+  compositeSignal: "long-spread" | "short-spread" | "none";
+  compositeRationale: string;
+  tradeGate: "open" | "closed";
+  timestamp: number;
+}
+
+export interface StatArbResponse {
+  report: StatArbReport;
+  generatedAt: string;
+}
+
 export const api = {
   strategies: () => fetchJson<StrategiesResponse>("/api/strategies"),
   signals: () => fetchJson<SignalsResponse>("/api/signals"),
@@ -340,4 +394,5 @@ export const api = {
   volatility: () => fetchJson<VolatilityResponse>("/api/volatility"),
   fractal: () => fetchJson<FractalResponse>("/api/fractal"),
   information: () => fetchJson<InformationResponse>("/api/information"),
+  statArb: () => fetchJson<StatArbResponse>("/api/statarb"),
 };

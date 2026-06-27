@@ -15,6 +15,7 @@ const TYPE_LABELS: Record<string, string> = {
   breakout: "Breakout",
   carry: "Carry",
   "cross-asset": "Cross-Asset TE",
+  "stat-arb": "Stat-Arb OU",
 };
 
 export function SignalCard({ signal }: SignalCardProps) {

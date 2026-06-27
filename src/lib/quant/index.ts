@@ -314,6 +314,66 @@ export function getLiveSignals(): LiveSignal[] {
     });
   }
 
+  // --- Stat-arb spread-reversion signal injection (Phase 1.5) ---
+  // Per spec: trade the spread when OU deviation > 2σ with θ confirming, AND
+  // half-life is valid, AND cointegration holds. The composite signal already
+  // combines OU + Kalman agreement. Direction: long-spread = buy XAU / sell EUR
+  // (spread too low, expect reversion up); short-spread = sell XAU / buy EUR.
+  const statArb = getStatArb(500);
+  if (statArb.compositeSignal !== "none" && statArb.tradeGate === "open") {
+    const isLongSpread = statArb.compositeSignal === "long-spread";
+    // Long-spread → buy the spread → buy XAU, sell EUR. We report two legs.
+    const legSymbol: Symbol = isLongSpread ? "XAU/USD" : "EUR/USD";
+    const legBars = getSeries(legSymbol).bars;
+    const legIdx = legBars.length - 1;
+    const legPe = peBySymbol.get(legSymbol) ?? { multiplier: 1, state: "normal" as const };
+    const legFract = fractalBySymbol.get(legSymbol);
+    const legFractalGate = legFract?.tradeGate ?? "caution";
+    // Confidence from the OU deviation (|z| scaled to 0.5–1.0).
+    const saConfidence = Math.min(1, Math.max(0.5, (statArb.ou.deviation - 1) / 3));
+    const saEff = saConfidence * legPe.multiplier;
+    let saStatus: LiveSignal["signalStatus"];
+    let saNote: string;
+    if (legFractalGate === "closed") {
+      saStatus = "hold";
+      saNote = `stat-arb · fractal gate CLOSED for ${legSymbol}`;
+    } else if (legPe.state === "random" && saEff < 0.15) {
+      saStatus = "hold";
+      saNote = `stat-arb · PE random → exposure eliminated`;
+    } else {
+      saStatus = "active";
+      saNote = `stat-arb spread ${statArb.compositeSignal} (OU z=${statArb.ou.zScore.toFixed(2)}, HL=${statArb.ou.halfLife.toFixed(1)}b, Kalman z=${statArb.kalman.residualZScore.toFixed(2)})`;
+    }
+    out.push({
+      strategyCode: "stat-arb-ou",
+      strategyName: "Stat-Arb Spread Reversion (OU + Kalman)",
+      strategyType: "stat-arb",
+      symbol: legSymbol,
+      direction: isLongSpread ? "long" : "short",
+      confidence: saConfidence,
+      price: legBars[legIdx]?.close ?? 0,
+      rationale: statArb.compositeRationale,
+      indicators: {
+        ouZ: statArb.ou.zScore,
+        ouTheta: statArb.ou.theta,
+        halfLife: statArb.ou.halfLife,
+        kalmanZ: statArb.kalman.residualZScore,
+        hedgeRatio: statArb.kalman.hedgeRatio,
+      },
+      timestamp: legBars[legIdx]?.time ?? Date.now(),
+      dispatch: "mean-reversion",
+      regimeActive: true, // stat-arb bypasses HMM (it's a structural spread trade)
+      regimeNote: "stat-arb · HMM bypass",
+      fractalGate: legFractalGate,
+      signalStatus: saStatus,
+      statusNote: saNote,
+      peSizingMultiplier: legPe.multiplier,
+      peState: legPe.state,
+      effectiveConfidence: saEff,
+      isCrossAsset: false,
+    });
+  }
+
   return out;
 }
 
