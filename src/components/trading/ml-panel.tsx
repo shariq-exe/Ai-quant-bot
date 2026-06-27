@@ -25,6 +25,7 @@ import {
   Minus,
   ShieldCheck,
   ShieldX,
+  Scissors,
 } from "lucide-react";
 import type { MLReport, SpecialistRegime } from "@/lib/api";
 
@@ -150,6 +151,33 @@ export function MLPanel({ report }: MLPanelProps) {
             <span className="text-[9px] font-mono text-slate-400">{val.passRationale}</span>
           </div>
         </div>
+
+        {/* SHAP-driven feature pruning banner */}
+        {report.pruningApplied && (
+          <div className={`flex items-start gap-2 px-2 py-1.5 rounded border ${
+            report.pruningImproved
+              ? "border-emerald-500/30 bg-emerald-500/5"
+              : "border-amber-500/30 bg-amber-500/5"
+          }`}>
+            <Scissors className={`h-3.5 w-3.5 shrink-0 mt-0.5 ${report.pruningImproved ? "text-emerald-400" : "text-amber-400"}`} />
+            <div className="flex flex-col gap-0.5">
+              <span className={`text-[10px] font-mono font-semibold uppercase ${report.pruningImproved ? "text-emerald-400" : "text-amber-400"}`}>
+                PRUNED {report.prunedFeatures.length} FEATURE{report.prunedFeatures.length > 1 ? "S" : ""} {report.pruningImproved ? "→ IMPROVED" : "→ NO IMPROVEMENT"}
+              </span>
+              <span className="text-[9px] font-mono text-slate-400">
+                removed: {report.prunedFeatures.join(", ")}
+              </span>
+              <span className="text-[9px] font-mono text-slate-500">
+                deflated Sharpe: {report.validation.deflatedSharpe.toFixed(2)} → {report.prunedValidation.deflatedSharpe.toFixed(2)}
+              </span>
+            </div>
+          </div>
+        )}
+        {!report.pruningApplied && report.shapImportance.some((s) => !s.stable) && (
+          <div className="text-[9px] font-mono text-amber-400/70 italic px-2">
+            unstable features detected but pruning not applied ({report.pruningNote})
+          </div>
+        )}
 
         {/* Validation stats */}
         <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">

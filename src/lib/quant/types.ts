@@ -97,6 +97,18 @@ export interface MLReport {
   validation: MLValidationResult;
   // SHAP-style feature importance (aggregated across specialists)
   shapImportance: { feature: string; importance: number; stable: boolean }[];
+  // --- SHAP-driven feature pruning (spec: "prune features with unstable importance") ---
+  // Two-pass: train with all 12 features, compute SHAP, identify unstable,
+  // retrain without them. The pruned model is the one used for signal injection.
+  pruningApplied: boolean;
+  prunedFeatures: string[]; // features removed (unstable)
+  retainedFeatures: string[]; // features kept (stable)
+  prunedSpecialists: SpecialistModel[];
+  prunedEnsemble: EnsemblePrediction;
+  prunedValidation: MLValidationResult;
+  // Did pruning improve the validation?
+  pruningImproved: boolean;
+  pruningNote: string;
   timestamp: number;
 }
 

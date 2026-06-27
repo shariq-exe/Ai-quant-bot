@@ -385,14 +385,17 @@ export function getLiveSignals(): LiveSignal[] {
   // HMM-gated meta-learner) but respects fractal gate + PE sizing.
   try {
     const mlReport = getML("EUR/USD", 2000);
-    if (mlReport.ensemble.direction !== "flat" && mlReport.validation.passes) {
+    // Use the PRUNED model for signal injection (spec: prune unstable features).
+    const mlEns = mlReport.pruningApplied ? mlReport.prunedEnsemble : mlReport.ensemble;
+    const mlVal = mlReport.pruningApplied ? mlReport.prunedValidation : mlReport.validation;
+    if (mlEns.direction !== "flat" && mlVal.passes) {
       const mlSymbol: Symbol = "EUR/USD";
       const mlBars = getSeries(mlSymbol).bars;
       const mlIdx = mlBars.length - 1;
       const mlPe = peBySymbol.get(mlSymbol) ?? { multiplier: 1, state: "normal" as const };
       const mlFract = fractalBySymbol.get(mlSymbol);
       const mlFractalGate = mlFract?.tradeGate ?? "caution";
-      const mlConfidence = Math.min(1, Math.max(0.4, mlReport.ensemble.confidence));
+      const mlConfidence = Math.min(1, Math.max(0.4, mlEns.confidence));
       const mlEff = mlConfidence * mlPe.multiplier;
       let mlStatus: LiveSignal["signalStatus"];
       let mlNote: string;
@@ -404,22 +407,22 @@ export function getLiveSignals(): LiveSignal[] {
         mlNote = `ML ensemble · PE random → exposure eliminated`;
       } else {
         mlStatus = "active";
-        mlNote = `ML ensemble ${mlReport.ensemble.direction} (dom=${mlReport.ensemble.dominantRegime}, conf=${mlReport.ensemble.confidence.toFixed(2)}, OOS Sharpe=${mlReport.validation.oosSharpe.toFixed(2)}, deflated=${mlReport.validation.deflatedSharpe.toFixed(2)})`;
+        mlNote = `ML ensemble ${mlEns.direction} (dom=${mlEns.dominantRegime}, conf=${mlEns.confidence.toFixed(2)}, OOS Sharpe=${mlVal.oosSharpe.toFixed(2)}, deflated=${mlVal.deflatedSharpe.toFixed(2)}${mlReport.pruningApplied ? ", pruned" : ""})`;
       }
       out.push({
         strategyCode: "ml-ensemble",
         strategyName: "ML Ensemble (GBT+Ridge+LSTM, HMM-gated)",
         strategyType: "ml-ensemble",
         symbol: mlSymbol,
-        direction: mlReport.ensemble.direction,
+        direction: mlEns.direction,
         confidence: mlConfidence,
         price: mlBars[mlIdx]?.close ?? 0,
-        rationale: `Ensemble pred=${mlReport.ensemble.predictedReturn.toExponential(2)}, dominant=${mlReport.ensemble.dominantRegime}, validation=${mlReport.validation.passes ? "PASS" : "FAIL"}`,
+        rationale: `Ensemble pred=${mlEns.predictedReturn.toExponential(2)}, dominant=${mlEns.dominantRegime}, validation=${mlVal.passes ? "PASS" : "FAIL"}${mlReport.pruningApplied ? ", pruned=" + mlReport.prunedFeatures.length + "feat" : ""}`,
         indicators: {
-          predictedReturn: mlReport.ensemble.predictedReturn,
-          confidence: mlReport.ensemble.confidence,
-          oosSharpe: mlReport.validation.oosSharpe,
-          deflatedSharpe: mlReport.validation.deflatedSharpe,
+          predictedReturn: mlEns.predictedReturn,
+          confidence: mlEns.confidence,
+          oosSharpe: mlVal.oosSharpe,
+          deflatedSharpe: mlVal.deflatedSharpe,
         },
         timestamp: mlBars[mlIdx]?.time ?? Date.now(),
         dispatch: "mean-reversion",

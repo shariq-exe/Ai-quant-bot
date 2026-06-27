@@ -355,13 +355,23 @@ export function trainEnsemble(
     direction,
   };
 
-  // SHAP-style aggregated importance: average normalized importance across specialists.
+  // SHAP-style aggregated importance with rank-based stability.
+  // A feature is "stable" if it ranks in the top half of importance in at
+  // least 2 of 3 specialists (rank-based, robust to different importance scales
+  // across tree-based vs linear models). The spec says to prune unstable features.
+  const halfD = Math.floor(featureNames.length / 2);
   const shapImportance = featureNames.map((f, i) => {
     const imps = specialists.map((s) => s.featureImportance[i]?.importance ?? 0);
     const avgImp = mean(imps);
     const impStd = std(imps);
-    // Stable = low coefficient of variation across specialists
-    const stable = avgImp > 0 && impStd / avgImp < 0.5;
+    // Rank-based stability: count how many specialists rank this feature in the top half.
+    let topHalfCount = 0;
+    for (const s of specialists) {
+      const allImps = s.featureImportance.map((fi) => fi.importance).sort((a, b) => b - a);
+      const threshold = allImps[halfD] ?? 0;
+      if ((s.featureImportance[i]?.importance ?? 0) >= threshold) topHalfCount++;
+    }
+    const stable = topHalfCount >= 2; // stable if top-half in majority of specialists
     return { feature: f, importance: avgImp, stable };
   }).sort((a, b) => b.importance - a.importance);
 

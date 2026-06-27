@@ -443,6 +443,15 @@ export interface MLReport {
   ensemble: EnsemblePrediction;
   validation: MLValidationResult;
   shapImportance: { feature: string; importance: number; stable: boolean }[];
+  // SHAP-driven feature pruning
+  pruningApplied: boolean;
+  prunedFeatures: string[];
+  retainedFeatures: string[];
+  prunedSpecialists: SpecialistModel[];
+  prunedEnsemble: EnsemblePrediction;
+  prunedValidation: MLValidationResult;
+  pruningImproved: boolean;
+  pruningNote: string;
   timestamp: number;
 }
 

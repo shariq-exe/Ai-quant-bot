@@ -10,7 +10,6 @@
 // All pure TypeScript, no external deps.
 
 import type { MLFeatureReport, MLValidationResult } from "../types";
-import { FEATURE_NAMES } from "./features";
 import { trainRidge } from "./ensemble";
 import { mean, std, sharpe, normalCdf } from "../statistics";
 
@@ -52,12 +51,13 @@ export function cpcv(
     for (let i = testStart; i < testEnd; i++) testIdx.push(i);
     if (trainIdx.length < 10 || testIdx.length < 2) continue;
 
-    const X = trainIdx.map((i) => FEATURE_NAMES.map((f) => matrix[i].features[f] ?? 0));
+    const fn = featureReport.featureNames;
+    const X = trainIdx.map((i) => fn.map((f) => matrix[i].features[f] ?? 0));
     const y = trainIdx.map((i) => matrix[i].forwardReturn);
     // Train a ridge model (fast + robust for CV).
     const model = trainRidge(X, y, 1.0);
     // Predict on test fold.
-    const testX = testIdx.map((i) => FEATURE_NAMES.map((f) => matrix[i].features[f] ?? 0));
+    const testX = testIdx.map((i) => fn.map((f) => matrix[i].features[f] ?? 0));
     const testY = testIdx.map((i) => matrix[i].forwardReturn);
     const preds = testX.map((row) => model.intercept + row.reduce((s, v, i) => s + v * model.weights[i], 0));
     // Strategy returns: sign(pred) * actual return
@@ -100,10 +100,11 @@ export function walkForward(
     const trainIdx = Array.from({ length: split }, (_, i) => i);
     const testEnd = Math.min(split + step, n);
     const testIdx = Array.from({ length: testEnd - split }, (_, i) => split + i);
-    const X = trainIdx.map((i) => FEATURE_NAMES.map((f) => matrix[i].features[f] ?? 0));
+    const fn = featureReport.featureNames;
+    const X = trainIdx.map((i) => fn.map((f) => matrix[i].features[f] ?? 0));
     const y = trainIdx.map((i) => matrix[i].forwardReturn);
     const model = trainRidge(X, y, 1.0);
-    const testX = testIdx.map((i) => FEATURE_NAMES.map((f) => matrix[i].features[f] ?? 0));
+    const testX = testIdx.map((i) => fn.map((f) => matrix[i].features[f] ?? 0));
     const testY = testIdx.map((i) => matrix[i].forwardReturn);
     const preds = testX.map((row) => model.intercept + row.reduce((s, v, i) => s + v * model.weights[i], 0));
     const stratReturns = preds.map((p, i) => Math.sign(p) * testY[i]);
