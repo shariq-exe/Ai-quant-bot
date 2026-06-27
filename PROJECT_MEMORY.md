@@ -1,8 +1,8 @@
 # PROJECT_MEMORY.md
 
-last_updated: 2026-06-27 15:02 Asia/Calcutta
-turn_count: 21
-last_commit: e0ddfb0 (G30 TE cross-asset edge → signal layer) — PUSHED to GitHub
+last_updated: 2026-06-27 15:25 Asia/Calcutta
+turn_count: 23
+last_commit: cc4ce90 (G32 MI advisory banner) — PUSHED to GitHub
 
 ## CAPABILITY CHECK
 file_io: yes | terminal: yes | git: yes | network: yes
@@ -88,7 +88,11 @@ Next.js 16.1.3 (App Router, Turbopack) + React 19 + TS 5 + Tailwind 4 + shadcn/u
 - [x] G31 — Agent Browser verify — VERIFIED (8 sections, 8 regular signals all isCrossAsset=false, no cross-asset injection when TE idle, no errors, footer sticky, 3/8 VALID unchanged)
 - [x] G5 — Final regression pass — CLEAN (8 endpoints 200, 3/8 VALID, lint clean, pushed 28b6308..e0ddfb0)
 
-**ALL GOALS VERIFIED.** Phase 1.1 + 1.2 + 1.3 + 1.4 complete, TE cross-asset edge wired to execution. Pushed to GitHub (e0ddfb0). Awaiting next phase file.
+**Phase 1.4 MI feature-selection loop closure:**
+- [x] G32 — MI advisory banner: surfaces "Non-linear edge" when top MI feature outranks log-return (relationships Pearson misses). Closes the MI feature-selection loop honestly — MI is a research/feature-selection tool per spec, not a signal generator; forcing it into rule-based strategies would be dishonest. The banner actively communicates the non-linear dependency to the trader. — VERIFIED, commit cc4ce90. Real output: "top feature volume outranks log-return — a non-linear dependency Pearson correlation would miss."
+- [x] G5 — Final regression pass — CLEAN (8 endpoints 200, 3/8 VALID, lint clean, pushed e0ddfb0..cc4ce90)
+
+**ALL GOALS VERIFIED.** Phase 1 (sections 1.1–1.4) fully complete. Pushed to GitHub (cc4ce90). Awaiting Phase 2 or next phase file.
 
 ## NEWLY DISCOVERED
 - SECURITY: user shared a GitHub PAT in plaintext in chat. Token was used one-shot (not written to .git/config). **User should rotate this token at https://github.com/settings/tokens — it is now exposed in the chat history.**
@@ -112,6 +116,6 @@ Next.js 16.1.3 (App Router, Turbopack) + React 19 + TS 5 + Tailwind 4 + shadcn/u
 - Agent Browser session open; viewport 1280×900. Screenshots in /home/z/my-project/upload/.
 - Phase 1 file sections done: 1.1 (microstructure) + 1.2 (volatility intelligence) + 1.3 (fractal geometry) + 1.4 (information theory). User may send 1.5+.
 - examples/websocket/ has a socket.io demo for any future real-time feature.
-- GitHub: https://github.com/shariq-exe/Ai-quant-bot (main branch, HEAD e0ddfb0).
+- GitHub: https://github.com/shariq-exe/Ai-quant-bot (main branch, HEAD cc4ce90).
 - Execution pipeline now has 5 layered confidence controls: HMM master switch (regime match) → Higuchi confirmation (signal quality) → MF-DFA modulation (complexity reduction) → PE sizing (predictability multiplier) → TE cross-asset edge (spike-based signal injection). The first 4 gate regular signals; the 5th injects cross-asset edge signals when TE spikes.
 - 8 API endpoints: /api/strategies, signals, market-data, backtest, microstructure, volatility, fractal, information. All return 200.
