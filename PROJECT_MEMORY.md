@@ -1,8 +1,8 @@
 # PROJECT_MEMORY.md
 
-last_updated: 2026-06-27 15:25 Asia/Calcutta
-turn_count: 23
-last_commit: cc4ce90 (G32 MI advisory banner) — PUSHED to GitHub
+last_updated: 2026-06-27 15:55 Asia/Calcutta
+turn_count: 25
+last_commit: 676276b (G33-G35 stat-arb + signal injection) — PUSHED to GitHub
 
 ## CAPABILITY CHECK
 file_io: yes | terminal: yes | git: yes | network: yes
@@ -92,7 +92,13 @@ Next.js 16.1.3 (App Router, Turbopack) + React 19 + TS 5 + Tailwind 4 + shadcn/u
 - [x] G32 — MI advisory banner: surfaces "Non-linear edge" when top MI feature outranks log-return (relationships Pearson misses). Closes the MI feature-selection loop honestly — MI is a research/feature-selection tool per spec, not a signal generator; forcing it into rule-based strategies would be dishonest. The banner actively communicates the non-linear dependency to the trader. — VERIFIED, commit cc4ce90. Real output: "top feature volume outranks log-return — a non-linear dependency Pearson correlation would miss."
 - [x] G5 — Final regression pass — CLEAN (8 endpoints 200, 3/8 VALID, lint clean, pushed e0ddfb0..cc4ce90)
 
-**ALL GOALS VERIFIED.** Phase 1 (sections 1.1–1.4) fully complete. Pushed to GitHub (cc4ce90). Awaiting Phase 2 or next phase file.
+**Phase 1.5 statistical arbitrage & mean-reversion:**
+- [x] G33 — Stat-arb library: Ornstein-Uhlenbeck MLE (θ/μ/σ on AR(1) of spread, half-life=-ln2/lnβ with validity gate 1≤HL≤maxHolding), Kalman Filter dynamic hedge ratio (demeaned series — fixes β explosion bug where fitting log(XAU)≈7.7 on log(EUR)≈0.08 made β=82), Johansen-style cointegration test (ADF on OLS residuals). Composite OU+Kalman signal with trade gate. — VERIFIED, commit 76fc7db. Real output: θ=0.0075, HL=92.4 bars (invalid > 48), β=-0.429 (negative — honest, synthetic data's independent regimes), gate CLOSED.
+- [x] G34+G35 — /api/statarb endpoint + StatArbPanel (OU spread chart with 2σ bands + equilibrium, Kalman residual mini-chart, cointegration + half-life gate, composite signal banner) + wire stat-arb signal into signal layer: inject spread-reversion signal when composite fires AND gate open. Bypasses HMM (structural spread trade) but respects fractal gate + PE sizing. — VERIFIED, commit 676276b. Note: gate currently CLOSED (HL=92 > 48, not cointegrated) so injection correctly idle; will fire when spread mean-reverts faster.
+- [x] G36 — Agent Browser verify — VERIFIED (9 sections render incl "Statistical Arbitrage & Mean-Reversion", OU spread chart + Kalman residual + cointegration + half-life gate all render real data, "GATE CLOSED" + "half-life 92.4 > 48 holding (won't complete)" visible, no errors, footer sticky, 3/8 VALID unchanged)
+- [x] G5 — Final regression pass — CLEAN (9 endpoints 200, 3/8 VALID, lint clean, pushed cc4ce90..676276b)
+
+**ALL GOALS VERIFIED.** Phase 1 (sections 1.1–1.5) complete, stat-arb spread-reversion wired to execution. Pushed to GitHub (676276b). Awaiting next phase file.
 
 ## NEWLY DISCOVERED
 - SECURITY: user shared a GitHub PAT in plaintext in chat. Token was used one-shot (not written to .git/config). **User should rotate this token at https://github.com/settings/tokens — it is now exposed in the chat history.**
@@ -114,8 +120,9 @@ Next.js 16.1.3 (App Router, Turbopack) + React 19 + TS 5 + Tailwind 4 + shadcn/u
 - Quant engine caches series per symbol (96k bars, deterministic seeds) + 5-min TTL on backtest suite cache. Microstructure ~55ms, volatility ~85ms per symbol (fresh each call).
 - 3 validated strategies: decay-mom EUR/USD (Sharpe 3.70, p=0.0019, 1155 trades), carry-proxy EUR/USD (Sharpe 3.57, p=0.0003, 1719 trades), carry-proxy XAU/USD (Sharpe 3.60, p=0.0003, 1645 trades).
 - Agent Browser session open; viewport 1280×900. Screenshots in /home/z/my-project/upload/.
-- Phase 1 file sections done: 1.1 (microstructure) + 1.2 (volatility intelligence) + 1.3 (fractal geometry) + 1.4 (information theory). User may send 1.5+.
+- Phase 1 file sections done: 1.1 (microstructure) + 1.2 (volatility) + 1.3 (fractal) + 1.4 (information theory) + 1.5 (stat-arb). User may send 1.6+.
 - examples/websocket/ has a socket.io demo for any future real-time feature.
-- GitHub: https://github.com/shariq-exe/Ai-quant-bot (main branch, HEAD cc4ce90).
-- Execution pipeline now has 5 layered confidence controls: HMM master switch (regime match) → Higuchi confirmation (signal quality) → MF-DFA modulation (complexity reduction) → PE sizing (predictability multiplier) → TE cross-asset edge (spike-based signal injection). The first 4 gate regular signals; the 5th injects cross-asset edge signals when TE spikes.
-- 8 API endpoints: /api/strategies, signals, market-data, backtest, microstructure, volatility, fractal, information. All return 200.
+- GitHub: https://github.com/shariq-exe/Ai-quant-bot (main branch, HEAD 676276b).
+- Execution pipeline now has 6 layered confidence controls: HMM master switch → Higuchi confirmation → MF-DFA modulation → PE sizing → TE cross-asset edge → stat-arb spread-reversion. The first 4 gate regular signals; the last 2 inject additional signals (cross-asset edge when TE spikes, spread-reversion when OU+Kalman agree + half-life valid + cointegrated).
+- 9 API endpoints: /api/strategies, signals, market-data, backtest, microstructure, volatility, fractal, information, statarb. All return 200.
+- Anti-pattern added: Kalman filter on raw log-prices with different scales (log XAU≈7.7 vs log EUR≈0.08) makes β explode to fit the level. FIX: demean both series before the Kalman fit so β tracks the hedge ratio on deviations. See statarb.ts kalmanHedgeRatio.
