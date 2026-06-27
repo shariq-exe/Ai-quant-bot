@@ -1,8 +1,8 @@
 # PROJECT_MEMORY.md
 
-last_updated: 2026-06-26 16:08 Asia/Calcutta
-turn_count: 7
-last_commit: e8ad97b (G12+G13 volatility panel) — PUSHED to GitHub
+last_updated: 2026-06-27 09:48 Asia/Calcutta
+turn_count: 9
+last_commit: d5e1fbc (G15 HMM master switch → live signals) — PUSHED to GitHub
 
 ## CAPABILITY CHECK
 file_io: yes | terminal: yes | git: yes | network: yes
@@ -50,7 +50,12 @@ Next.js 16.1.3 (App Router, Turbopack) + React 19 + TS 5 + Tailwind 4 + shadcn/u
 - [x] G14 — Agent Browser verify volatility panel — VERIFIED (6 sections render, no errors, real GARCH/HMM/jump data, click dispatch works)
 - [x] G5 — Final regression pass — CLEAN (3 VALID strategies, 6 endpoints 200, all 6 dashboard sections, lint clean)
 
-**ALL GOALS VERIFIED.** Phase 1.1 + 1.2 complete. Pushed to GitHub (e8ad97b). Awaiting next phase file.
+**Phase 1.2 master-switch wiring (continued from "where I stopped"):**
+- [x] G15 — Wire HMM master switch → live signals: tag each signal with `regimeActive` (strategy type vs active dispatch family; carry always eligible), /api/signals returns dispatch context, SignalCard emphasizes active (amber ring) / dims suppressed (opacity-45), regime note per card, dashboard adds regime-filter toggle + per-symbol dispatch banner — VERIFIED, commit d5e1fbc
+- [x] G16 — Agent Browser verify regime-aware signals — VERIFIED (ACTIVE/SUPPRESSED badges render, filter toggle works both ways: ON→only active visible, OFF→all 8 back, no errors, 6 sections intact, footer sticky)
+- [x] G5 — Final regression pass — CLEAN (6 endpoints 200, lint clean, 3/8 VALID, pushed e8ad97b..d5e1fbc)
+
+**ALL GOALS VERIFIED.** Phase 1.1 + 1.2 complete, HMM master switch fully wired to execution layer. Pushed to GitHub (d5e1fbc). Awaiting next phase file.
 
 ## NEWLY DISCOVERED
 - SECURITY: user shared a GitHub PAT in plaintext in chat. Token was used one-shot (not written to .git/config). **User should rotate this token at https://github.com/settings/tokens — it is now exposed in the chat history.**
@@ -59,6 +64,7 @@ Next.js 16.1.3 (App Router, Turbopack) + React 19 + TS 5 + Tailwind 4 + shadcn/u
 ## DO NOT RE-ATTEMPT
 - Forcing z-score-mr valid via threshold loosening — destroys the honest signal. It's legitimately negative after costs on this synthetic data.
 - Per-bar trend drift > baseSigma * 0.2 — causes price collapse/explosion over long runs.
+- Using blue/sky/indigo colors for dispatch families — project constraint forbids blue/indigo. Use emerald (mean-reversion), amber (breakout-prep), violet (momentum) instead. Caught in G15: initially used `text-sky-400`/`#60a5fa` for momentum, fixed to violet `#a78bfa`.
 
 ## AGENT BROWSER NOTES
 - After `agent-browser reload`, the session sometimes drops to `about:blank`. Use `agent-browser open http://localhost:3000/` + a 8-9s wait to re-establish.
