@@ -9,6 +9,8 @@ import { runBacktest, type BacktestConfig, type BacktestResult } from "./backtes
 import type { StrategySummary } from "./backtest";
 import { computeMicrostructure } from "./microstructure";
 import type { MicrostructureReport } from "./microstructure";
+import { computeVolatility } from "./volatility";
+import type { VolatilityReport } from "./volatility";
 
 // 1-hour bars over ~11 years → ~96k bars per symbol. Long enough that validated
 // strategies accumulate >1000 trades at their proper (non-overfit) thresholds.
@@ -174,4 +176,19 @@ export function getMicrostructure(symbol: Symbol, lookback = 500): Microstructur
 // All symbols' microstructure reports (for the dashboard panel).
 export function getAllMicrostructure(lookback = 500): MicrostructureReport[] {
   return SYMBOLS.map((s) => getMicrostructure(s, lookback));
+}
+
+// Volatility intelligence report for one symbol: GARCH regime, bipower-variation
+// jump detection, and HMM master-switch state with strategy dispatch.
+export function getVolatility(symbol: Symbol, lookback = 500): VolatilityReport {
+  const { bars, regimes } = getSeries(symbol);
+  const recent = bars.slice(-lookback);
+  const recentRegimes = regimes.slice(-lookback);
+  const legacyRegime = recentRegimes[recentRegimes.length - 1] ?? "calm";
+  return computeVolatility(symbol, recent, legacyRegime);
+}
+
+// All symbols' volatility reports (for the dashboard panel).
+export function getAllVolatility(lookback = 500): VolatilityReport[] {
+  return SYMBOLS.map((s) => getVolatility(s, lookback));
 }
