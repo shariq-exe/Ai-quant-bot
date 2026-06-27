@@ -272,6 +272,61 @@ export interface FractalResponse {
   generatedAt: string;
 }
 
+// --- Information theory types (mirror src/lib/quant/information.ts) ---
+
+export interface TransferEntropyResult {
+  teXtoY: number;
+  teYtoX: number;
+  netTE: number;
+  leadDirection: "XAU-leads-EUR" | "EUR-leads-XAU" | "balanced";
+  spike: boolean;
+  spikeZScore: number;
+  series: { time: number; teXtoY: number; teYtoX: number }[];
+}
+
+export interface PermutationEntropyResult {
+  pe: number;
+  rollingMean: number;
+  rollingStd: number;
+  percentile: number;
+  state: "predictable" | "normal" | "random";
+  sizingMultiplier: number;
+  series: { time: number; pe: number }[];
+}
+
+export interface MutualInfoFeature {
+  feature: string;
+  mi: number;
+  rank: number;
+}
+
+export interface MutualInfoResult {
+  features: MutualInfoFeature[];
+  topFeature: string;
+  topMI: number;
+  informativeCount: number;
+}
+
+export interface InformationReport {
+  symbols: [Symbol, Symbol];
+  transferEntropy: TransferEntropyResult;
+  permutationEntropy: { [K in Symbol]: PermutationEntropyResult };
+  mutualInfo: MutualInfoResult;
+  crossAssetEdge:
+    | "xau-leads-eur-long"
+    | "xau-leads-eur-short"
+    | "eur-leads-xau-long"
+    | "eur-leads-xau-short"
+    | "none";
+  edgeRationale: string;
+  timestamp: number;
+}
+
+export interface InformationResponse {
+  report: InformationReport;
+  generatedAt: string;
+}
+
 export const api = {
   strategies: () => fetchJson<StrategiesResponse>("/api/strategies"),
   signals: () => fetchJson<SignalsResponse>("/api/signals"),
@@ -284,4 +339,5 @@ export const api = {
   microstructure: () => fetchJson<MicrostructureResponse>("/api/microstructure"),
   volatility: () => fetchJson<VolatilityResponse>("/api/volatility"),
   fractal: () => fetchJson<FractalResponse>("/api/fractal"),
+  information: () => fetchJson<InformationResponse>("/api/information"),
 };
