@@ -15,13 +15,22 @@ export type VolRegime = "low-vol" | "transitional" | "high-vol";
 export type StrategyDispatch = "mean-reversion" | "breakout-prep" | "momentum";
 
 // Gaussian Hidden Markov Model state (3-4 hidden states decoded by Viterbi).
+// Multivariate over 4 features: log-returns, realized vol, volume skewness,
+// spread proxy (diagonal-covariance Gaussian emissions).
 export interface HMMState {
   state: number; // decoded state index
   label: string; // human-readable state name
   probability: number; // forward probability of current state (0..1)
-  stateMeans: number[]; // mean log-return per state
-  stateVols: number[]; // vol per state
+  // Legacy single-value fields (mean/vol of the log-return feature, feature 0)
+  // kept for backward compat with the dashboard's HMM bar chart.
+  stateMeans: number[]; // mean of log-return feature per state
+  stateVols: number[]; // vol of log-return feature per state
   logLikelihood: number; // model fit
+  // Multivariate feature details (Phase 1.2 spec: 4 features).
+  featureNames: string[]; // ["log-return", "realized-vol", "vol-skew", "spread-proxy"]
+  stateFeatureMeans: number[][]; // [state][feature] mean
+  stateFeatureVols: number[][]; // [state][feature] std-dev
+  currentFeatures: number[]; // the 4 feature values at the current bar
 }
 
 export interface VolatilityReport {

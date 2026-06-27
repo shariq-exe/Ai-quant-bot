@@ -178,6 +178,11 @@ export interface HMMState {
   stateMeans: number[];
   stateVols: number[];
   logLikelihood: number;
+  // Multivariate (4 features: log-return, realized-vol, vol-skew, spread-proxy)
+  featureNames: string[];
+  stateFeatureMeans: number[][]; // [state][feature]
+  stateFeatureVols: number[][];
+  currentFeatures: number[];
 }
 
 export interface VolatilityReport {

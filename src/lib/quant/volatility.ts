@@ -229,23 +229,30 @@ export function detectJumps(bars: Bar[], window = 50): JumpReport {
 }
 
 // ===========================================================================
-// 3. Gaussian Hidden Markov Model (3 states) — Baum-Welch + Viterbi + forward
+// 3. Multivariate Gaussian HMM (3 states, 4 features) — Baum-Welch + Viterbi
 // ===========================================================================
-// Model: 3 hidden states, each emitting a Gaussian(μ_k, σ_k²). Trained by
-// Baum-Welch EM on the log-return sequence. Decoded by Viterbi (most likely
-// state path) + forward algorithm gives the posterior P(state_t | obs_{1:t}).
+// Model: 3 hidden states, each emitting a 4-D Gaussian with DIAGONAL covariance
+// over the features [log-return, realized-vol, volume-skew, spread-proxy].
+// Trained by Baum-Welch EM. Decoded by Viterbi (most likely state path) +
+// forward algorithm gives the posterior P(state_t | obs_{1:t}).
 //
-// State ordering: after training, states are sorted by σ so state 0 = lowest
-// vol, state 2 = highest vol. This makes the "master switch" mapping stable
-// across retraining: low-vol state → mean-reversion, mid → breakout-prep,
-// high-vol → momentum.
+// This implements the Phase 1.2 spec exactly: "Train a Gaussian HMM with 3-4
+// hidden states using features: log-returns, realized volatility, volume
+// profile skewness, and spread dynamics."
+//
+// State ordering: after training, states are sorted by the realized-vol feature
+// mean so state 0 = lowest vol, state 2 = highest vol. This makes the "master
+// switch" mapping stable across retraining.
+
+const HMM_FEATURE_NAMES = ["log-return", "realized-vol", "vol-skew", "spread-proxy"];
 
 interface HMMParams {
   N: number; // number of states
+  D: number; // number of features (dimensions)
   pi: number[]; // initial state probs
   A: number[][]; // transition matrix
-  mu: number[]; // state means
-  sigma: number[]; // state vols
+  mu: number[][]; // [state][feature] means
+  sigma: number[][]; // [state][feature] std-devs (diagonal cov)
 }
 
 interface HMMResult {
@@ -256,34 +263,87 @@ interface HMMResult {
   iterations: number;
 }
 
-function gaussianPdf(x: number, mu: number, sigma: number): number {
-  const s = Math.max(sigma, 1e-9);
-  const z = (x - mu) / s;
-  return Math.exp(-0.5 * z * z) / (s * Math.sqrt(2 * Math.PI));
+// Extract the 4 HMM features from a bar series. Returns a T×D matrix aligned
+// with the bars (the first row is a zero vector since realized vol / skew /
+// spread need a lookback). Each feature is standardized to zero mean / unit
+// variance over the window so no single feature dominates the Gaussian fit.
+export function extractHMMFeatures(bars: Bar[], rvWindow = 20, skewWindow = 50): number[][] {
+  const n = bars.length;
+  const feats: number[][] = Array.from({ length: n }, () => new Array(4).fill(0));
+  // Feature 0: log-return.
+  // Feature 1: realized volatility over rvWindow (sum of squared log-returns).
+  // Feature 2: volume profile skewness over skewWindow (third-moment normalized).
+  // Feature 3: spread proxy = (high - low) / close, a Corwin-Schultz-style
+  //            bid-ask spread estimator from the bar's range.
+  const logRets: number[] = [0];
+  for (let i = 1; i < n; i++) logRets.push(Math.log(bars[i].close / bars[i - 1].close));
+  for (let i = 0; i < n; i++) {
+    feats[i][0] = logRets[i];
+    // realized vol
+    let rv = 0;
+    const rvStart = Math.max(1, i - rvWindow + 1);
+    for (let j = rvStart; j <= i; j++) rv += logRets[j] * logRets[j];
+    feats[i][1] = Math.sqrt(rv / Math.max(i - rvStart + 1, 1));
+    // volume skewness
+    if (i >= skewWindow) {
+      const vols: number[] = [];
+      for (let j = i - skewWindow + 1; j <= i; j++) vols.push(bars[j].volume);
+      const m = vols.reduce((a, b) => a + b, 0) / vols.length;
+      const sd = Math.sqrt(vols.reduce((a, b) => a + (b - m) ** 2, 0) / vols.length) || 1e-9;
+      const sk = vols.reduce((a, b) => a + ((b - m) / sd) ** 3, 0) / vols.length;
+      feats[i][2] = sk;
+    } else {
+      feats[i][2] = 0;
+    }
+    // spread proxy
+    feats[i][3] = i > 0 ? (bars[i].high - bars[i].low) / bars[i].close : 0;
+  }
+  // Standardize each feature column (skip the warmup zeros).
+  for (let d = 0; d < 4; d++) {
+    const col: number[] = [];
+    for (let i = skewWindow; i < n; i++) col.push(feats[i][d]);
+    if (col.length < 2) continue;
+    const m = col.reduce((a, b) => a + b, 0) / col.length;
+    const sd = Math.sqrt(col.reduce((a, b) => a + (b - m) ** 2, 0) / (col.length - 1)) || 1e-9;
+    for (let i = 0; i < n; i++) feats[i][d] = (feats[i][d] - m) / sd;
+  }
+  return feats;
 }
 
-// Forward algorithm with scaling (avoids underflow). Returns alpha (scaled),
-// scaling factors, and log-likelihood.
-function forward(obs: number[], p: HMMParams): { alpha: number[][]; logLik: number } {
+// Diagonal-covariance multivariate Gaussian PDF. Returns the product of
+// per-feature 1-D Gaussians (independence assumption). Log-form internally
+// for numerical stability, exponentiated at the end.
+function mvGaussianPdf(x: number[], mu: number[], sigma: number[]): number {
+  let logp = 0;
+  const D = x.length;
+  for (let d = 0; d < D; d++) {
+    const s = Math.max(sigma[d], 1e-9);
+    const z = (x[d] - mu[d]) / s;
+    logp += -0.5 * (Math.log(2 * Math.PI) + Math.log(s * s) + z * z);
+  }
+  return Math.exp(logp);
+}
+
+// Forward algorithm with scaling (avoids underflow). Returns alpha (scaled)
+// and log-likelihood.
+function forward(obs: number[][], p: HMMParams): { alpha: number[][]; logLik: number } {
   const T = obs.length;
   const alpha: number[][] = Array.from({ length: T }, () => new Array(p.N).fill(0));
   const scales: number[] = new Array(T).fill(0);
-  // init
   let scaleSum = 0;
   for (let i = 0; i < p.N; i++) {
-    alpha[0][i] = p.pi[i] * gaussianPdf(obs[0], p.mu[i], p.sigma[i]);
+    alpha[0][i] = p.pi[i] * mvGaussianPdf(obs[0], p.mu[i], p.sigma[i]);
     scaleSum += alpha[0][i];
   }
   scales[0] = scaleSum || 1;
   for (let i = 0; i < p.N; i++) alpha[0][i] /= scales[0];
-  // recurse
   let logLik = Math.log(scales[0]);
   for (let t = 1; t < T; t++) {
     scaleSum = 0;
     for (let j = 0; j < p.N; j++) {
       let s = 0;
       for (let i = 0; i < p.N; i++) s += alpha[t - 1][i] * p.A[i][j];
-      alpha[t][j] = s * gaussianPdf(obs[t], p.mu[j], p.sigma[j]);
+      alpha[t][j] = s * mvGaussianPdf(obs[t], p.mu[j], p.sigma[j]);
       scaleSum += alpha[t][j];
     }
     scales[t] = scaleSum || 1;
@@ -294,7 +354,7 @@ function forward(obs: number[], p: HMMParams): { alpha: number[][]; logLik: numb
 }
 
 // Backward algorithm with the same scaling.
-function backward(obs: number[], p: HMMParams, scales: number[]): number[][] {
+function backward(obs: number[][], p: HMMParams, scales: number[]): number[][] {
   const T = obs.length;
   const beta: number[][] = Array.from({ length: T }, () => new Array(p.N).fill(0));
   for (let i = 0; i < p.N; i++) beta[T - 1][i] = 1 / scales[T - 1];
@@ -302,7 +362,7 @@ function backward(obs: number[], p: HMMParams, scales: number[]): number[][] {
     for (let i = 0; i < p.N; i++) {
       let s = 0;
       for (let j = 0; j < p.N; j++) {
-        s += p.A[i][j] * gaussianPdf(obs[t + 1], p.mu[j], p.sigma[j]) * beta[t + 1][j];
+        s += p.A[i][j] * mvGaussianPdf(obs[t + 1], p.mu[j], p.sigma[j]) * beta[t + 1][j];
       }
       beta[t][i] = s / scales[t];
     }
@@ -311,12 +371,12 @@ function backward(obs: number[], p: HMMParams, scales: number[]): number[][] {
 }
 
 // Viterbi: most likely state path.
-function viterbi(obs: number[], p: HMMParams): number[] {
+function viterbi(obs: number[][], p: HMMParams): number[] {
   const T = obs.length;
   const delta: number[][] = Array.from({ length: T }, () => new Array(p.N).fill(0));
   const psi: number[][] = Array.from({ length: T }, () => new Array(p.N).fill(0));
   for (let i = 0; i < p.N; i++) {
-    delta[0][i] = Math.log(Math.max(p.pi[i], 1e-12)) + Math.log(Math.max(gaussianPdf(obs[0], p.mu[i], p.sigma[i]), 1e-12));
+    delta[0][i] = Math.log(Math.max(p.pi[i], 1e-12)) + Math.log(Math.max(mvGaussianPdf(obs[0], p.mu[i], p.sigma[i]), 1e-12));
   }
   for (let t = 1; t < T; t++) {
     for (let j = 0; j < p.N; j++) {
@@ -329,11 +389,10 @@ function viterbi(obs: number[], p: HMMParams): number[] {
           bestArg = i;
         }
       }
-      delta[t][j] = bestVal + Math.log(Math.max(gaussianPdf(obs[t], p.mu[j], p.sigma[j]), 1e-12));
+      delta[t][j] = bestVal + Math.log(Math.max(mvGaussianPdf(obs[t], p.mu[j], p.sigma[j]), 1e-12));
       psi[t][j] = bestArg;
     }
   }
-  // backtrack
   const path = new Array(T).fill(0);
   let bestFinal = 0;
   for (let i = 1; i < p.N; i++) if (delta[T - 1][i] > delta[T - 1][bestFinal]) bestFinal = i;
@@ -342,62 +401,81 @@ function viterbi(obs: number[], p: HMMParams): number[] {
   return path;
 }
 
-// Baum-Welch EM training. Initializes from quantiles of the return distribution,
-// runs up to `maxIter` iterations or until log-lik converges.
-export function trainHMM(returns: number[], N = 3, maxIter = 30): HMMResult | null {
-  const T = returns.length;
-  if (T < N * 10) return null;
-  // Initialize means at quantiles, vols at overall vol / 2, transitions sticky.
-  const sorted = [...returns].sort((a, b) => a - b);
-  const quantile = (q: number) => sorted[Math.floor(q * (sorted.length - 1))];
-  const overallVol = Math.max(std(returns), 1e-9);
+// Baum-Welch EM training on the multivariate observation matrix. Initializes
+// state means at quantiles of the realized-vol feature (feature 1) so states
+// span the vol spectrum, then refines.
+export function trainHMM(bars: Bar[], N = 3, maxIter = 30): HMMResult | null {
+  const obs = extractHMMFeatures(bars);
+  const T = obs.length;
+  const D = 4;
+  // Skip warmup rows where features are zero/undefined.
+  const startIdx = Math.min(50, T - 1);
+  const usable = obs.slice(startIdx);
+  const Tu = usable.length;
+  if (Tu < N * 10) return null;
+
+  // Initialize: sort observations by realized-vol (feature 1) and pick N
+  // quantile centroids. Sigmas init at the overall per-feature std.
+  const byVol = [...usable].sort((a, b) => a[1] - b[1]);
+  const initMu: number[][] = [];
+  for (let k = 0; k < N; k++) {
+    const center = byVol[Math.floor(((k + 0.5) / N) * Tu)];
+    initMu.push([...center]);
+  }
+  const initSigma: number[][] = Array.from({ length: N }, () => {
+    const s: number[] = [];
+    for (let d = 0; d < D; d++) {
+      const col = usable.map((o) => o[d]);
+      const m = col.reduce((a, b) => a + b, 0) / col.length;
+      const v = col.reduce((a, b) => a + (b - m) ** 2, 0) / (col.length - 1);
+      s.push(Math.max(Math.sqrt(v), 1e-3));
+    }
+    return s;
+  });
+
   let p: HMMParams = {
     N,
+    D,
     pi: new Array(N).fill(1 / N),
     A: Array.from({ length: N }, (_, i) =>
       Array.from({ length: N }, (_, j) => (i === j ? 0.85 : 0.15 / (N - 1)))
     ),
-    mu: Array.from({ length: N }, (_, k) => quantile((k + 0.5) / N)),
-    sigma: new Array(N).fill(overallVol * 0.7),
+    mu: initMu,
+    sigma: initSigma,
   };
 
   let prevLL = -Infinity;
   let iterations = 0;
   for (let iter = 0; iter < maxIter; iter++) {
     iterations = iter + 1;
-    const { alpha, logLik } = forward(returns, p);
-    const beta = backward(returns, p, new Array(T).fill(1)); // unscaled beta for gamma
-    // To get proper posteriors we re-run forward with scaling and use alpha/beta
-    // from the scaled forward + a scaled backward. For numerical stability we
-    // compute gamma = alpha * beta (scaled versions) and normalize.
-    // Re-derive scaled beta using the forward scales:
-    const scales: number[] = new Array(T).fill(1);
+    const { alpha, logLik } = forward(usable, p);
+    // Compute scaled beta via the forward scales.
+    const scales: number[] = new Array(Tu).fill(1);
     {
-      // recompute scales from a fresh forward pass
-      const a2: number[][] = Array.from({ length: T }, () => new Array(N).fill(0));
+      const a2: number[][] = Array.from({ length: Tu }, () => new Array(N).fill(0));
       let sc = 0;
       for (let i = 0; i < N; i++) {
-        a2[0][i] = p.pi[i] * gaussianPdf(returns[0], p.mu[i], p.sigma[i]);
+        a2[0][i] = p.pi[i] * mvGaussianPdf(usable[0], p.mu[i], p.sigma[i]);
         sc += a2[0][i];
       }
       scales[0] = sc || 1;
       for (let i = 0; i < N; i++) a2[0][i] /= scales[0];
-      for (let t = 1; t < T; t++) {
+      for (let t = 1; t < Tu; t++) {
         sc = 0;
         for (let j = 0; j < N; j++) {
           let s = 0;
           for (let i = 0; i < N; i++) s += a2[t - 1][i] * p.A[i][j];
-          a2[t][j] = s * gaussianPdf(returns[t], p.mu[j], p.sigma[j]);
+          a2[t][j] = s * mvGaussianPdf(usable[t], p.mu[j], p.sigma[j]);
           sc += a2[t][j];
         }
         scales[t] = sc || 1;
         for (let j = 0; j < N; j++) a2[t][j] /= scales[t];
       }
     }
-    const bScaled = backward(returns, p, scales);
+    const bScaled = backward(usable, p, scales);
     // gamma[t][i] = alpha_scaled[t][i] * beta_scaled[t][i] / sum_k(...)
-    const gamma: number[][] = Array.from({ length: T }, () => new Array(N).fill(0));
-    for (let t = 0; t < T; t++) {
+    const gamma: number[][] = Array.from({ length: Tu }, () => new Array(N).fill(0));
+    for (let t = 0; t < Tu; t++) {
       let s = 0;
       for (let i = 0; i < N; i++) {
         gamma[t][i] = alpha[t][i] * bScaled[t][i];
@@ -405,17 +483,16 @@ export function trainHMM(returns: number[], N = 3, maxIter = 30): HMMResult | nu
       }
       if (s > 0) for (let i = 0; i < N; i++) gamma[t][i] /= s;
     }
-    // xi sums for transitions: xi[i][j] = sum_t gamma_t-like quantity.
-    // Use the standard scaled form.
+    // xi sums for transitions.
     const newA: number[][] = Array.from({ length: N }, () => new Array(N).fill(0));
     const rowSum = new Array(N).fill(0);
-    for (let t = 0; t < T - 1; t++) {
+    for (let t = 0; t < Tu - 1; t++) {
       for (let i = 0; i < N; i++) {
         for (let j = 0; j < N; j++) {
           const num =
             alpha[t][i] *
             p.A[i][j] *
-            gaussianPdf(returns[t + 1], p.mu[j], p.sigma[j]) *
+            mvGaussianPdf(usable[t + 1], p.mu[j], p.sigma[j]) *
             bScaled[t + 1][j];
           newA[i][j] += num;
           rowSum[i] += num;
@@ -427,26 +504,34 @@ export function trainHMM(returns: number[], N = 3, maxIter = 30): HMMResult | nu
         newA[i][j] = rowSum[i] > 0 ? newA[i][j] / rowSum[i] : 1 / N;
       }
     }
-    // M-step: update means and sigmas weighted by gamma.
-    const newMu = new Array(N).fill(0);
-    const newVar = new Array(N).fill(0);
+    // M-step: update per-feature means and sigmas weighted by gamma.
+    const newMu: number[][] = Array.from({ length: N }, () => new Array(D).fill(0));
+    const newVar: number[][] = Array.from({ length: N }, () => new Array(D).fill(0));
     const gammaSum = new Array(N).fill(0);
-    for (let t = 0; t < T; t++) {
+    for (let t = 0; t < Tu; t++) {
       for (let i = 0; i < N; i++) {
-        newMu[i] += gamma[t][i] * returns[t];
         gammaSum[i] += gamma[t][i];
+        for (let d = 0; d < D; d++) newMu[i][d] += gamma[t][i] * usable[t][d];
       }
     }
-    for (let i = 0; i < N; i++) newMu[i] = gammaSum[i] > 0 ? newMu[i] / gammaSum[i] : quantile((i + 0.5) / N);
-    for (let t = 0; t < T; t++) {
+    for (let i = 0; i < N; i++) {
+      for (let d = 0; d < D; d++) {
+        newMu[i][d] = gammaSum[i] > 0 ? newMu[i][d] / gammaSum[i] : initMu[i][d];
+      }
+    }
+    for (let t = 0; t < Tu; t++) {
       for (let i = 0; i < N; i++) {
-        newVar[i] += gamma[t][i] * (returns[t] - newMu[i]) ** 2;
+        for (let d = 0; d < D; d++) {
+          newVar[i][d] += gamma[t][i] * (usable[t][d] - newMu[i][d]) ** 2;
+        }
       }
     }
-    const newSigma = newMu.map((_, i) =>
-      Math.sqrt(Math.max(newVar[i] / Math.max(gammaSum[i], 1e-9), 1e-12))
-    );
-    // Update pi from first-step gamma.
+    const newSigma: number[][] = Array.from({ length: N }, () => new Array(D).fill(1e-3));
+    for (let i = 0; i < N; i++) {
+      for (let d = 0; d < D; d++) {
+        newSigma[i][d] = Math.sqrt(Math.max(newVar[i][d] / Math.max(gammaSum[i], 1e-9), 1e-6));
+      }
+    }
     const newPi = new Array(N).fill(1 / N);
     let piSum = 0;
     for (let i = 0; i < N; i++) {
@@ -455,30 +540,28 @@ export function trainHMM(returns: number[], N = 3, maxIter = 30): HMMResult | nu
     }
     for (let i = 0; i < N; i++) newPi[i] /= piSum;
 
-    p = { N, pi: newPi, A: newA, mu: newMu, sigma: newSigma };
+    p = { N, D, pi: newPi, A: newA, mu: newMu, sigma: newSigma };
 
     if (Math.abs(logLik - prevLL) < 1e-4) break;
     prevLL = logLik;
   }
 
-  // Sort states by sigma ascending (low-vol → high-vol) for stable labeling.
-  const order = p.mu.map((_, i) => i).sort((a, b) => p.sigma[a] - p.sigma[b]);
-  const invOrder = new Array(N).fill(0);
-  order.forEach((origIdx, newIdx) => (invOrder[origIdx] = newIdx));
+  // Sort states by the realized-vol feature mean (feature 1) ascending.
+  const order = p.mu.map((_, i) => i).sort((a, b) => p.mu[a][1] - p.mu[b][1]);
   const sortedP: HMMParams = {
     N,
+    D,
     pi: order.map((o) => p.pi[o]),
     A: order.map((o) => order.map((o2) => p.A[o][o2])),
     mu: order.map((o) => p.mu[o]),
     sigma: order.map((o) => p.sigma[o]),
   };
-  const { alpha, logLik } = forward(returns, sortedP);
-  // Posterior: normalize each row of alpha.
+  const { alpha, logLik } = forward(usable, sortedP);
   const forwardProbs = alpha.map((row) => {
     const s = row.reduce((acc, v) => acc + v, 0) || 1;
     return row.map((v) => v / s);
   });
-  const vit = viterbi(returns, sortedP).map((s) => s); // already in sorted indexing
+  const vit = viterbi(usable, sortedP);
 
   return { params: sortedP, viterbi: vit, forwardProbs, logLikelihood: logLik, iterations };
 }
@@ -514,19 +597,27 @@ export function computeVolatility(
   // --- Jumps ---
   const jumps = detectJumps(bars, 50);
 
-  // --- HMM (master switch) ---
-  const hmmFit = trainHMM(rets, 3, 25);
+  // --- HMM (master switch) — multivariate over 4 features ---
+  const hmmFit = trainHMM(bars, 3, 25);
+  // Current feature vector (last bar) for the report.
+  const allFeats = extractHMMFeatures(bars);
+  const currentFeats = allFeats[allFeats.length - 1] ?? [0, 0, 0, 0];
   let hmm: HMMState;
   if (hmmFit) {
     const lastState = hmmFit.viterbi[hmmFit.viterbi.length - 1];
     const lastPosterior = hmmFit.forwardProbs[hmmFit.forwardProbs.length - 1];
+    // Legacy single-value fields: use the log-return feature (index 0).
     hmm = {
       state: lastState,
       label: STATE_LABELS[lastState] ?? `State ${lastState}`,
       probability: lastPosterior[lastState],
-      stateMeans: hmmFit.params.mu,
-      stateVols: hmmFit.params.sigma,
+      stateMeans: hmmFit.params.mu.map((m) => m[0]),
+      stateVols: hmmFit.params.sigma.map((s) => s[0]),
       logLikelihood: hmmFit.logLikelihood,
+      featureNames: HMM_FEATURE_NAMES,
+      stateFeatureMeans: hmmFit.params.mu,
+      stateFeatureVols: hmmFit.params.sigma,
+      currentFeatures: currentFeats,
     };
   } else {
     // Fallback: synthesize an HMM state from the GARCH regime.
@@ -539,6 +630,10 @@ export function computeVolatility(
       stateMeans: [0, 0, 0],
       stateVols: [longRunVol * 0.6, longRunVol, longRunVol * 1.5],
       logLikelihood: 0,
+      featureNames: HMM_FEATURE_NAMES,
+      stateFeatureMeans: [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
+      stateFeatureVols: [[1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1]],
+      currentFeatures: currentFeats,
     };
   }
 
