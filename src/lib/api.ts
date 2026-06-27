@@ -381,6 +381,76 @@ export interface StatArbResponse {
   generatedAt: string;
 }
 
+// --- ML types (mirror src/lib/quant/types.ts ML section) ---
+
+export interface MLFeatureStats {
+  name: string;
+  mean: number;
+  std: number;
+  mi: number;
+  stability: number;
+}
+
+export interface MLFeatureReport {
+  symbol: Symbol;
+  featureNames: string[];
+  featureMatrix: { time: number; features: Record<string, number>; forwardReturn: number }[];
+  featureStats: MLFeatureStats[];
+  sampleCount: number;
+  startYear: number;
+  endYear: number;
+}
+
+export type SpecialistRegime = "trending" | "mean-reverting" | "volatile";
+
+export interface SpecialistModel {
+  regime: SpecialistRegime;
+  modelType: "gradient-boosted-trees" | "ridge-regression" | "lstm-proxy";
+  trainR2: number;
+  trainMSE: number;
+  oosR2: number;
+  oosMSE: number;
+  featureImportance: { feature: string; importance: number }[];
+  weights: Record<string, number>;
+  trainSamples: number;
+}
+
+export interface EnsemblePrediction {
+  predictedReturn: number;
+  confidence: number;
+  specialistPredictions: { regime: SpecialistRegime; prediction: number; weight: number }[];
+  dominantRegime: SpecialistRegime;
+  direction: "long" | "short" | "flat";
+}
+
+export interface MLValidationResult {
+  cpcvFolds: number;
+  cpcvEmbargoBars: number;
+  foldSharpeRatios: number[];
+  oosSharpe: number;
+  deflatedSharpe: number;
+  numTrials: number;
+  walkForwardWindows: { start: number; end: number; oosSharpe: number }[];
+  oosYears: number;
+  passes: boolean;
+  passRationale: string;
+}
+
+export interface MLReport {
+  symbol: Symbol;
+  features: MLFeatureReport;
+  specialists: SpecialistModel[];
+  ensemble: EnsemblePrediction;
+  validation: MLValidationResult;
+  shapImportance: { feature: string; importance: number; stable: boolean }[];
+  timestamp: number;
+}
+
+export interface MLResponse {
+  report: MLReport;
+  generatedAt: string;
+}
+
 export const api = {
   strategies: () => fetchJson<StrategiesResponse>("/api/strategies"),
   signals: () => fetchJson<SignalsResponse>("/api/signals"),
@@ -395,4 +465,5 @@ export const api = {
   fractal: () => fetchJson<FractalResponse>("/api/fractal"),
   information: () => fetchJson<InformationResponse>("/api/information"),
   statArb: () => fetchJson<StatArbResponse>("/api/statarb"),
+  ml: (symbol: Symbol) => fetchJson<MLResponse>(`/api/ml?symbol=${encodeURIComponent(symbol)}`),
 };

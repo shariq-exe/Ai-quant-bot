@@ -377,6 +377,67 @@ export function getLiveSignals(): LiveSignal[] {
     });
   }
 
+  // --- ML ensemble signal injection (Phase 1.6) ---
+  // Per spec: the HMM-gated ensemble of specialists produces a direction
+  // prediction. Inject it as a signal when the ensemble direction is non-flat
+  // AND the anti-overfit validation passes (CPCV + Deflated Sharpe gate).
+  // This is the 7th signal source. Bypasses HMM dispatch (the ensemble IS the
+  // HMM-gated meta-learner) but respects fractal gate + PE sizing.
+  try {
+    const mlReport = getML("EUR/USD", 2000);
+    if (mlReport.ensemble.direction !== "flat" && mlReport.validation.passes) {
+      const mlSymbol: Symbol = "EUR/USD";
+      const mlBars = getSeries(mlSymbol).bars;
+      const mlIdx = mlBars.length - 1;
+      const mlPe = peBySymbol.get(mlSymbol) ?? { multiplier: 1, state: "normal" as const };
+      const mlFract = fractalBySymbol.get(mlSymbol);
+      const mlFractalGate = mlFract?.tradeGate ?? "caution";
+      const mlConfidence = Math.min(1, Math.max(0.4, mlReport.ensemble.confidence));
+      const mlEff = mlConfidence * mlPe.multiplier;
+      let mlStatus: LiveSignal["signalStatus"];
+      let mlNote: string;
+      if (mlFractalGate === "closed") {
+        mlStatus = "hold";
+        mlNote = `ML ensemble · fractal gate CLOSED`;
+      } else if (mlPe.state === "random" && mlEff < 0.15) {
+        mlStatus = "hold";
+        mlNote = `ML ensemble · PE random → exposure eliminated`;
+      } else {
+        mlStatus = "active";
+        mlNote = `ML ensemble ${mlReport.ensemble.direction} (dom=${mlReport.ensemble.dominantRegime}, conf=${mlReport.ensemble.confidence.toFixed(2)}, OOS Sharpe=${mlReport.validation.oosSharpe.toFixed(2)}, deflated=${mlReport.validation.deflatedSharpe.toFixed(2)})`;
+      }
+      out.push({
+        strategyCode: "ml-ensemble",
+        strategyName: "ML Ensemble (GBT+Ridge+LSTM, HMM-gated)",
+        strategyType: "ml-ensemble",
+        symbol: mlSymbol,
+        direction: mlReport.ensemble.direction,
+        confidence: mlConfidence,
+        price: mlBars[mlIdx]?.close ?? 0,
+        rationale: `Ensemble pred=${mlReport.ensemble.predictedReturn.toExponential(2)}, dominant=${mlReport.ensemble.dominantRegime}, validation=${mlReport.validation.passes ? "PASS" : "FAIL"}`,
+        indicators: {
+          predictedReturn: mlReport.ensemble.predictedReturn,
+          confidence: mlReport.ensemble.confidence,
+          oosSharpe: mlReport.validation.oosSharpe,
+          deflatedSharpe: mlReport.validation.deflatedSharpe,
+        },
+        timestamp: mlBars[mlIdx]?.time ?? Date.now(),
+        dispatch: "mean-reversion",
+        regimeActive: true,
+        regimeNote: "ML ensemble · HMM-gated (bypass)",
+        fractalGate: mlFractalGate,
+        signalStatus: mlStatus,
+        statusNote: mlNote,
+        peSizingMultiplier: mlPe.multiplier,
+        peState: mlPe.state,
+        effectiveConfidence: mlEff,
+        isCrossAsset: false,
+      });
+    }
+  } catch {
+    // ML computation is heavy; if it fails, skip injection silently.
+  }
+
   return out;
 }
 
