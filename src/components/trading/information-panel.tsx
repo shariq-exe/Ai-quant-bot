@@ -256,6 +256,17 @@ export function InformationPanel({ report }: InformationPanelProps) {
             top: <span className="font-mono text-amber-300">{report.mutualInfo.topFeature}</span> (MI={report.mutualInfo.topMI.toFixed(4)})
           </span>
         </div>
+        {/* MI advisory banner — interprets the feature ranking for the trader */}
+        {report.mutualInfo.topFeature && report.mutualInfo.topFeature !== "log-return" && (
+          <div className="flex items-start gap-2 px-2 py-1.5 rounded border border-amber-500/30 bg-amber-500/5">
+            <GaugeIcon className="h-3 w-3 text-amber-400 shrink-0 mt-0.5" />
+            <p className="text-[9px] leading-snug text-amber-200/80">
+              <span className="font-semibold">Non-linear edge:</span> top feature{" "}
+              <span className="font-mono">{report.mutualInfo.topFeature}</span> outranks log-return —
+              a non-linear dependency Pearson correlation would miss. Prioritize this feature in signal design.
+            </p>
+          </div>
+        )}
         <p className="text-[9px] text-slate-500 leading-tight">
           MI captures non-linear deps Pearson misses. Bars in amber exceed the 0.05-bit informative threshold.
         </p>
