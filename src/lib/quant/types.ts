@@ -5,6 +5,69 @@ export type Symbol = "EUR/USD" | "XAU/USD";
 
 export type Regime = "trend" | "revert" | "highvol" | "calm";
 
+// --- Statistical arbitrage & mean-reversion (Phase 1.5) ---
+
+export interface OUResult {
+  theta: number; // mean-reversion speed (per bar)
+  mu: number; // equilibrium level (log-spread)
+  sigma: number; // OU process volatility
+  halfLife: number; // bars (= -ln(2)/θ when θ>0, else Infinity)
+  // Current spread stats
+  currentSpread: number;
+  zScore: number; // (spread - μ) / σ_OU
+  deviation: number; // |zScore|
+  // Trade signal: enter when |z| > 2 AND θ confirms reversion speed
+  entrySignal: "long-spread" | "short-spread" | "none";
+  // Half-life validity per spec (1 ≤ HL ≤ maxHolding)
+  halfLifeValid: boolean;
+  halfLifeNote: string;
+  // Spread series for charting
+  series: { time: number; spread: number; equilibrium: number; upperBand: number; lowerBand: number }[];
+}
+
+export interface KalmanResult {
+  // Dynamic hedge ratio β_t (time-varying)
+  hedgeRatio: number;
+  hedgeRatioSeries: { time: number; beta: number }[];
+  // Residual = Y - β·X (the trading signal)
+  residual: number;
+  residualMean: number;
+  residualStd: number;
+  residualZScore: number; // standardized innovation
+  // Entry when |residual z| > 2
+  entrySignal: "long-residual" | "short-residual" | "none";
+  // Innovation sequence stats (spec: "±2 standard deviations of its innovation sequence")
+  innovationSeries: { time: number; residual: number }[];
+  // Filter convergence (posterior variance — lower = more confident)
+  posteriorVariance: number;
+}
+
+export interface CointegrationResult {
+  // Johansen-style trace statistic (simplified eigenvalue-based test)
+  isCointegrated: boolean;
+  traceStat: number;
+  criticalValue: number; // 5% critical value
+  pValue: number;
+  // The eigenvector (cointegrating vector) [1, -β]
+  cointegratingVector: [number, number];
+  note: string;
+}
+
+export interface StatArbReport {
+  symbols: [Symbol, Symbol];
+  // The spread being analyzed: log(XAU) - β·log(EUR) using the Kalman β
+  spreadLabel: string;
+  ou: OUResult;
+  kalman: KalmanResult;
+  cointegration: CointegrationResult;
+  // Composite signal: combines OU z-score + Kalman residual + half-life gate
+  compositeSignal: "long-spread" | "short-spread" | "none";
+  compositeRationale: string;
+  // Trade gate: only trade when half-life is valid AND cointegration holds
+  tradeGate: "open" | "closed";
+  timestamp: number;
+}
+
 // --- Information theory & causality (Phase 1.4) ---
 
 export interface TransferEntropyResult {

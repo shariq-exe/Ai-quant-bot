@@ -16,6 +16,8 @@ import { computeFractal } from "./fractal";
 import type { FractalReport } from "./fractal";
 import { computeInformation } from "./information";
 import type { InformationReport } from "./information";
+import { computeStatArb } from "./statarb";
+import type { StatArbReport } from "./statarb";
 
 // 1-hour bars over ~11 years → ~96k bars per symbol. Long enough that validated
 // strategies accumulate >1000 trades at their proper (non-overfit) thresholds.
@@ -375,4 +377,13 @@ export function getInformation(lookback = 500): InformationReport {
   const eur = getSeries("EUR/USD").bars.slice(-lookback);
   const xau = getSeries("XAU/USD").bars.slice(-lookback);
   return computeInformation(eur, xau);
+}
+
+// Statistical-arbitrage report: OU process (θ/μ/σ) on the EUR-XAU spread,
+// Kalman Filter dynamic hedge ratio + residual signal, Johansen cointegration
+// test, half-life of mean reversion with validity gate.
+export function getStatArb(lookback = 500): StatArbReport {
+  const eur = getSeries("EUR/USD").bars.slice(-lookback);
+  const xau = getSeries("XAU/USD").bars.slice(-lookback);
+  return computeStatArb(eur, xau, 48);
 }
