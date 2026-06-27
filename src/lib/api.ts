@@ -162,6 +162,55 @@ export interface MicrostructureResponse {
   generatedAt: string;
 }
 
+// --- Volatility intelligence types (mirror src/lib/quant/volatility.ts) ---
+
+export type VolRegime = "low-vol" | "transitional" | "high-vol";
+export type StrategyDispatch = "mean-reversion" | "breakout-prep" | "momentum";
+
+export interface HMMState {
+  state: number;
+  label: string;
+  probability: number;
+  stateMeans: number[];
+  stateVols: number[];
+  logLikelihood: number;
+}
+
+export interface VolatilityReport {
+  symbol: Symbol;
+  garch: {
+    regime: VolRegime;
+    regimeProbability: number;
+    conditionalVol: number;
+    longRunVol: number;
+    omega: number;
+    alpha: number;
+    beta: number;
+    persistence: number;
+    series: { time: number; vol: number; regime: VolRegime }[];
+  };
+  jumps: {
+    realizedVol: number;
+    bipowerVol: number;
+    jumpComponent: number;
+    jumpRatio: number;
+    jumpDetected: boolean;
+    jumpZScore: number;
+    recentJumps: { time: number; ratio: number; detected: boolean }[];
+  };
+  hmm: HMMState;
+  dispatch: StrategyDispatch;
+  dispatchRationale: string;
+  legacyRegime: string;
+  timestamp: number;
+}
+
+export interface VolatilityResponse {
+  reports: VolatilityReport[];
+  count: number;
+  generatedAt: string;
+}
+
 export const api = {
   strategies: () => fetchJson<StrategiesResponse>("/api/strategies"),
   signals: () => fetchJson<SignalsResponse>("/api/signals"),
@@ -172,4 +221,5 @@ export const api = {
       `/api/backtest?code=${encodeURIComponent(code)}&symbol=${encodeURIComponent(symbol)}`
     ),
   microstructure: () => fetchJson<MicrostructureResponse>("/api/microstructure"),
+  volatility: () => fetchJson<VolatilityResponse>("/api/volatility"),
 };
