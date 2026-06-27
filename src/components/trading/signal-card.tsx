@@ -89,8 +89,33 @@ export function SignalCard({ signal }: SignalCardProps) {
           <span className={dir === "flat" ? "text-slate-500" : dirColor}>
             {(signal.confidence * 100).toFixed(0)}%
           </span>
+          {signal.peSizingMultiplier !== 1 && (
+            <span
+              className={`ml-1 font-mono text-[9px] ${
+                signal.peSizingMultiplier > 1 ? "text-emerald-400" : "text-rose-400"
+              }`}
+              title={`PE ${signal.peState} → sizing ×${signal.peSizingMultiplier.toFixed(2)}`}
+            >
+              →{(signal.effectiveConfidence * 100).toFixed(0)}%
+            </span>
+          )}
         </span>
       </div>
+
+      {/* PE sizing badge */}
+      {signal.peSizingMultiplier !== 1 && (
+        <div className="flex items-center gap-1.5">
+          <span
+            className={`text-[9px] font-mono px-1 py-0 rounded ${
+              signal.peSizingMultiplier > 1
+                ? "bg-emerald-500/10 text-emerald-400"
+                : "bg-rose-500/10 text-rose-400"
+            }`}
+          >
+            PE {signal.peState} ×{signal.peSizingMultiplier.toFixed(2)}
+          </span>
+        </div>
+      )}
 
       <p className="text-[11px] leading-snug text-slate-400 line-clamp-2" title={signal.rationale}>
         {signal.rationale}

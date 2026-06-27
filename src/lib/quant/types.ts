@@ -316,15 +316,18 @@ export interface LiveSignal {
   regimeActive: boolean;
   regimeNote: string;
   // --- Fractal signal-quality gate (Phase 1.3) ---
-  // The fractal trade-gate status for this symbol: open / caution / closed.
   fractalGate: "open" | "caution" | "closed";
-  // Composite signal status: BOTH gates must pass for "active".
-  //   active    — HMM regime matches AND fractal gate ≠ closed
-  //   hold      — HMM regime matches BUT fractal gate closed (fractal contradicts)
-  //   suppressed — HMM regime does not match (regardless of fractal)
   signalStatus: "active" | "hold" | "suppressed";
-  // Human-readable reason for the composite status.
   statusNote: string;
+  // --- Permutation entropy sizing modulation (Phase 1.4) ---
+  // PE-derived sizing multiplier for this symbol: ×1.25 (predictable), ×1.0
+  // (normal), ×0.5 (random). Per spec: low PE → increase size, high PE → reduce.
+  peSizingMultiplier: number;
+  peState: "predictable" | "normal" | "random";
+  // Effective confidence after PE modulation = confidence × peSizingMultiplier.
+  // When this drops below 0.15, an active signal is downgraded to HOLD
+  // (the spec's "eliminate exposure" in the high-PE random regime).
+  effectiveConfidence: number;
 }
 
 // Per-symbol dispatch context returned alongside live signals so the dashboard

@@ -162,11 +162,18 @@ export function getDispatchContext(): SymbolDispatch[] {
 export function getLiveSignals(): LiveSignal[] {
   const out: LiveSignal[] = [];
   const lookback = 200;
-  // Precompute dispatch (HMM) + fractal gate per symbol.
+  // Precompute dispatch (HMM) + fractal gate + PE sizing per symbol.
   const dispatchBySymbol = new Map<Symbol, SymbolDispatch>();
   for (const d of getDispatchContext()) dispatchBySymbol.set(d.symbol, d);
   const fractalBySymbol = new Map<Symbol, FractalReport>();
   for (const f of getAllFractal(500)) fractalBySymbol.set(f.symbol, f);
+  // PE sizing from the information-theory report (per-symbol).
+  const info = getInformation(500);
+  const peBySymbol = new Map<Symbol, { multiplier: number; state: "predictable" | "normal" | "random" }>();
+  for (const sym of SYMBOLS) {
+    const pe = info.permutationEntropy[sym];
+    peBySymbol.set(sym, { multiplier: pe.sizingMultiplier, state: pe.state });
+  }
 
   for (const strat of STRATEGIES) {
     for (const sym of SYMBOLS) {
@@ -178,6 +185,7 @@ export function getLiveSignals(): LiveSignal[] {
         res.action === "enter-long" ? "long" : res.action === "enter-short" ? "short" : "flat";
       const ctx = dispatchBySymbol.get(sym);
       const fract = fractalBySymbol.get(sym);
+      const pe = peBySymbol.get(sym) ?? { multiplier: 1, state: "normal" as const };
       const family = STRATEGY_DISPATCH[strat.type] ?? "always";
       const regimeActive =
         family === "always" || family === ctx?.dispatch;
@@ -187,7 +195,7 @@ export function getLiveSignals(): LiveSignal[] {
           : `matches ${ctx?.dispatch} regime`
         : `suppressed — ${ctx?.dispatch} regime active`;
       const fractalGate = fract?.tradeGate ?? "caution";
-      // Composite 3-state status.
+      // Composite 3-state status (HMM + fractal gate).
       let signalStatus: LiveSignal["signalStatus"];
       let statusNote: string;
       if (!regimeActive) {
@@ -199,6 +207,17 @@ export function getLiveSignals(): LiveSignal[] {
       } else {
         signalStatus = "active";
         statusNote = regimeNote + (fractalGate === "caution" ? " · fractal caution" : " · fractal confirmed");
+      }
+      // PE sizing modulation (Phase 1.4 spec: increase size when predictable,
+      // reduce/eliminate when random). effectiveConfidence = confidence × multiplier.
+      const effectiveConfidence = res.strength * pe.multiplier;
+      // "Eliminate exposure": if PE is random and the effective confidence drops
+      // below 0.15, downgrade an active signal to HOLD.
+      if (signalStatus === "active" && pe.state === "random" && effectiveConfidence < 0.15) {
+        signalStatus = "hold";
+        statusNote += ` · PE random (×${pe.multiplier}) → exposure eliminated`;
+      } else if (signalStatus === "active" && pe.state !== "normal") {
+        statusNote += ` · PE ${pe.state} (×${pe.multiplier.toFixed(2)})`;
       }
       out.push({
         strategyCode: strat.code,
@@ -217,6 +236,9 @@ export function getLiveSignals(): LiveSignal[] {
         fractalGate,
         signalStatus,
         statusNote,
+        peSizingMultiplier: pe.multiplier,
+        peState: pe.state,
+        effectiveConfidence,
       });
     }
   }
