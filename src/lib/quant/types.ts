@@ -5,6 +5,101 @@ export type Symbol = "EUR/USD" | "XAU/USD";
 
 export type Regime = "trend" | "revert" | "highvol" | "calm";
 
+// --- Machine learning signal synthesis (Phase 1.6) ---
+
+// The 12 research-derived features per spec section 1.6.
+export interface MLFeatureVector {
+  time: number;
+  features: Record<string, number>;
+  // The target: next-bar forward return (for training)
+  forwardReturn: number;
+}
+
+export interface MLFeatureReport {
+  symbol: Symbol;
+  featureNames: string[]; // the 12 feature names, in canonical order
+  featureMatrix: MLFeatureVector[]; // aligned T×12 matrix
+  // Per-feature statistics for the display
+  featureStats: {
+    name: string;
+    mean: number;
+    std: number;
+    // Mutual information with the forward return (non-linear importance)
+    mi: number;
+    // Stability: |mean| / std (high = stable signal)
+    stability: number;
+  }[];
+  // Sample count + date range
+  sampleCount: number;
+  startYear: number;
+  endYear: number;
+}
+
+// The three specialist model types per spec.
+export type SpecialistRegime = "trending" | "mean-reverting" | "volatile";
+
+export interface SpecialistModel {
+  regime: SpecialistRegime;
+  modelType: "gradient-boosted-trees" | "ridge-regression" | "lstm-proxy";
+  // In-sample fit metrics
+  trainR2: number;
+  trainMSE: number;
+  // Out-of-sample metrics (from CPCV)
+  oosR2: number;
+  oosMSE: number;
+  // Feature importance (normalized 0..1, SHAP-style proxy)
+  featureImportance: { feature: string; importance: number }[];
+  // Model weights (learned coefficients or splits)
+  weights: Record<string, number>;
+  // Number of training samples
+  trainSamples: number;
+}
+
+export interface EnsemblePrediction {
+  // The HMM-regime-weighted blend of the 3 specialists
+  predictedReturn: number;
+  // Confidence (0..1) — how aligned the specialists are
+  confidence: number;
+  // Per-specialist raw predictions before gating
+  specialistPredictions: { regime: SpecialistRegime; prediction: number; weight: number }[];
+  // The dominant regime (which specialist drove the ensemble)
+  dominantRegime: SpecialistRegime;
+  // Direction signal derived from the predicted return
+  direction: "long" | "short" | "flat";
+}
+
+export interface MLValidationResult {
+  // Combinatorial Purged Cross-Validation with embargo
+  cpcvFolds: number;
+  cpcvEmbargoBars: number;
+  // Per-fold OOS Sharpe ratios
+  foldSharpeRatios: number[];
+  // Mean OOS Sharpe
+  oosSharpe: number;
+  // Deflated Sharpe Ratio (accounts for multiple testing bias)
+  deflatedSharpe: number;
+  // Number of trials used in the deflation (multiple testing correction)
+  numTrials: number;
+  // Walk-forward optimization result
+  walkForwardWindows: { start: number; end: number; oosSharpe: number }[];
+  // Years of out-of-sample data
+  oosYears: number;
+  // Verdict: does the model pass the anti-overfit protocol?
+  passes: boolean;
+  passRationale: string;
+}
+
+export interface MLReport {
+  symbol: Symbol;
+  features: MLFeatureReport;
+  specialists: SpecialistModel[];
+  ensemble: EnsemblePrediction;
+  validation: MLValidationResult;
+  // SHAP-style feature importance (aggregated across specialists)
+  shapImportance: { feature: string; importance: number; stable: boolean }[];
+  timestamp: number;
+}
+
 // --- Statistical arbitrage & mean-reversion (Phase 1.5) ---
 
 export interface OUResult {
