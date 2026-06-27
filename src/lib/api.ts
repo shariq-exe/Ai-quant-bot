@@ -220,6 +220,58 @@ export interface VolatilityResponse {
   generatedAt: string;
 }
 
+// --- Fractal geometry types (mirror src/lib/quant/fractal.ts) ---
+
+export type HurstRegime = "persistent" | "random-walk" | "anti-persistent";
+
+export interface HurstResult {
+  value: number;
+  method: "R/S" | "DFA";
+  regime: HurstRegime;
+  rSquared: number;
+}
+
+export interface TimeframeHurst {
+  timeframe: string;
+  barsPerWindow: number;
+  rs: HurstResult;
+  dfa: HurstResult;
+  dislocation: number;
+}
+
+export interface MFDAResult {
+  qValues: number[];
+  hValues: number[];
+  deltaH: number;
+  complexity: "simple" | "moderate" | "complex";
+  h2: number;
+}
+
+export interface HiguchiResult {
+  dimension: number;
+  signalQuality: "high" | "medium" | "low";
+  rSquared: number;
+}
+
+export interface FractalReport {
+  symbol: Symbol;
+  timeframes: TimeframeHurst[];
+  maxDislocation: number;
+  dislocationTimeframes: string;
+  mfdfa: MFDAResult;
+  higuchi: HiguchiResult;
+  dispatch: "momentum" | "mean-reversion" | "reduce-exposure";
+  dispatchRationale: string;
+  tradeGate: "open" | "caution" | "closed";
+  timestamp: number;
+}
+
+export interface FractalResponse {
+  reports: FractalReport[];
+  count: number;
+  generatedAt: string;
+}
+
 export const api = {
   strategies: () => fetchJson<StrategiesResponse>("/api/strategies"),
   signals: () => fetchJson<SignalsResponse>("/api/signals"),
@@ -231,4 +283,5 @@ export const api = {
     ),
   microstructure: () => fetchJson<MicrostructureResponse>("/api/microstructure"),
   volatility: () => fetchJson<VolatilityResponse>("/api/volatility"),
+  fractal: () => fetchJson<FractalResponse>("/api/fractal"),
 };
