@@ -195,6 +195,53 @@ export function VolatilityPanel({ reports }: VolatilityPanelProps) {
               </div>
             </div>
 
+            {/* HMM multivariate feature table (4 features × 3 states) */}
+            {r.hmm.featureNames && r.hmm.stateFeatureMeans && (
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-wide text-slate-500 flex items-center gap-1">
+                    <Layers className="h-3 w-3" /> HMM Feature Matrix (standardized)
+                  </span>
+                  <span className="text-[9px] font-mono text-slate-600">μ per state</span>
+                </div>
+                <div className="overflow-hidden rounded border border-slate-800/60">
+                  <table className="w-full text-[9px] font-mono">
+                    <thead>
+                      <tr className="bg-slate-900/60 text-slate-500">
+                        <th className="py-1 px-1.5 text-left font-medium">feature</th>
+                        {r.hmm.stateFeatureMeans.map((_, i) => (
+                          <th key={i} className={`py-1 px-1.5 text-right font-medium ${i === r.hmm.state ? "text-amber-400" : ""}`}>
+                            S{i}{i === r.hmm.state ? "●" : ""}
+                          </th>
+                        ))}
+                        <th className="py-1 px-1.5 text-right font-medium text-slate-400">now</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {r.hmm.featureNames.map((fn, fi) => (
+                        <tr key={fi} className="border-t border-slate-800/40">
+                          <td className="py-1 px-1.5 text-slate-400">{fn}</td>
+                          {r.hmm.stateFeatureMeans.map((row, si) => (
+                            <td
+                              key={si}
+                              className={`py-1 px-1.5 text-right ${
+                                si === r.hmm.state ? "text-amber-300/90 bg-amber-500/5" : "text-slate-300"
+                              }`}
+                            >
+                              {row[fi].toFixed(2)}
+                            </td>
+                          ))}
+                          <td className="py-1 px-1.5 text-right text-slate-500 italic">
+                            {r.hmm.currentFeatures[fi]?.toFixed(2) ?? "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {/* Jump detection */}
             <div className="flex items-center justify-between py-1.5 border-t border-slate-800/40">
               <div className="flex items-center gap-2">
