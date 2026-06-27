@@ -5,6 +5,63 @@ export type Symbol = "EUR/USD" | "XAU/USD";
 
 export type Regime = "trend" | "revert" | "highvol" | "calm";
 
+// --- Information theory & causality (Phase 1.4) ---
+
+export interface TransferEntropyResult {
+  // Directed TE in bits: X → Y and Y → X
+  teXtoY: number; // XAU → EUR
+  teYtoX: number; // EUR → XAU
+  netTE: number; // teXtoY - teYtoX (positive = X leads Y)
+  leadDirection: "XAU-leads-EUR" | "EUR-leads-XAU" | "balanced";
+  // Spike detection: is the dominant direction's TE elevated vs its rolling baseline?
+  spike: boolean;
+  spikeZScore: number;
+  // History for charting
+  series: { time: number; teXtoY: number; teYtoX: number }[];
+}
+
+export interface PermutationEntropyResult {
+  pe: number; // 0..1 (0 = perfectly ordered/predictable, 1 = random)
+  rollingMean: number;
+  rollingStd: number;
+  percentile: number; // rank in recent window (0..1)
+  // Predictability state per spec
+  state: "predictable" | "normal" | "random";
+  // Sizing multiplier per spec: low PE (predictable) → increase size, high PE → reduce
+  sizingMultiplier: number;
+  series: { time: number; pe: number }[];
+}
+
+export interface MutualInfoFeature {
+  feature: string;
+  mi: number; // mutual information with future returns (bits)
+  // Normalized rank 0..1 (1 = most informative)
+  rank: number;
+}
+
+export interface MutualInfoResult {
+  features: MutualInfoFeature[];
+  // The single most informative feature for future returns
+  topFeature: string;
+  topMI: number;
+  // Count of features with MI > 0.05 bits (non-trivial dependence)
+  informativeCount: number;
+}
+
+export interface InformationReport {
+  symbols: [Symbol, Symbol]; // always [EUR/USD, XAU/USD] for the TE pair
+  transferEntropy: TransferEntropyResult;
+  // Per-symbol PE (each symbol has its own predictability window)
+  permutationEntropy: {
+    [K in Symbol]: PermutationEntropyResult;
+  };
+  mutualInfo: MutualInfoResult;
+  // Composite cross-asset edge signal
+  crossAssetEdge: "xau-leads-eur-long" | "xau-leads-eur-short" | "eur-leads-xau-long" | "eur-leads-xau-short" | "none";
+  edgeRationale: string;
+  timestamp: number;
+}
+
 // --- Fractal geometry & long-memory analysis (Phase 1.3) ---
 
 // Hurst exponent interpretation:

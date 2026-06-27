@@ -14,6 +14,8 @@ import type { VolatilityReport } from "./volatility";
 import type { StrategyDispatch, SymbolDispatch } from "./types";
 import { computeFractal } from "./fractal";
 import type { FractalReport } from "./fractal";
+import { computeInformation } from "./information";
+import type { InformationReport } from "./information";
 
 // 1-hour bars over ~11 years → ~96k bars per symbol. Long enough that validated
 // strategies accumulate >1000 trades at their proper (non-overfit) thresholds.
@@ -273,4 +275,12 @@ export function getFractal(symbol: Symbol, lookback = 500): FractalReport {
 // All symbols' fractal reports (for the dashboard panel).
 export function getAllFractal(lookback = 500): FractalReport[] {
   return SYMBOLS.map((s) => getFractal(s, lookback));
+}
+
+// Information-theory report: Transfer Entropy (XAU↔EUR), Permutation Entropy
+// per symbol, Mutual Information feature ranking, composite cross-asset edge.
+export function getInformation(lookback = 500): InformationReport {
+  const eur = getSeries("EUR/USD").bars.slice(-lookback);
+  const xau = getSeries("XAU/USD").bars.slice(-lookback);
+  return computeInformation(eur, xau);
 }
