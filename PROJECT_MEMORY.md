@@ -1,8 +1,8 @@
 # PROJECT_MEMORY.md
 
-last_updated: 2026-06-27 10:38 Asia/Calcutta
-turn_count: 13
-last_commit: a4895fb (G19+G20 fractal geometry) — PUSHED to GitHub
+last_updated: 2026-06-27 11:02 Asia/Calcutta
+turn_count: 15
+last_commit: 488e6c8 (G22 fractal gate → signal layer) — PUSHED to GitHub
 
 ## CAPABILITY CHECK
 file_io: yes | terminal: yes | git: yes | network: yes
@@ -66,7 +66,12 @@ Next.js 16.1.3 (App Router, Turbopack) + React 19 + TS 5 + Tailwind 4 + shadcn/u
 - [x] G21 — Agent Browser verify fractal panel — VERIFIED (7 sections render, real Hurst/MF-DFA/Higuchi values, gate logic correct, no errors, regime-gated signals still ACTIVE=4/SUPPRESSED=4, footer sticky)
 - [x] G5 — Final regression pass — CLEAN (7 endpoints 200, 3/8 VALID, lint clean, pushed 209ff6b..a4895fb)
 
-**ALL GOALS VERIFIED.** Phase 1.1 + 1.2 + 1.3 complete. Pushed to GitHub (a4895fb). Awaiting next phase file.
+**Phase 1.3 fractal gate → execution layer (continued from "where I stopped"):**
+- [x] G22 — Wire fractal trade-gate into signal layer: compose HMM dispatch + fractal gate into 3-state `signalStatus` (active/hold/suppressed). active = both gates pass; hold = HMM ok but fractal gate closed; suppressed = HMM mismatch. SignalCard shows 3 distinct badges (⚡ACTIVE / ⏸HOLD / ⏻SUPPRESSED), gate filter respects composite status. Implements spec: "only trade when fractal dimension confirms the regime." — VERIFIED, commit 488e6c8. Real output: EUR/USD vol-breakout LONG → HOLD (HMM ok, fractal gate closed), XAU/USD vol-breakout → ACTIVE (both pass).
+- [x] G23 — Agent Browser verify — VERIFIED (3-state badges render: ACTIVE=2/HOLD=2/SUPPRESSED=4, filter toggle works both ways, 7 sections, no errors, footer sticky)
+- [x] G5 — Final regression pass — CLEAN (7 endpoints 200, 3/8 VALID, lint clean, pushed a4895fb..488e6c8)
+
+**ALL GOALS VERIFIED.** Phase 1.1 + 1.2 + 1.3 complete, fractal gate fully wired to execution. Pushed to GitHub (488e6c8). Awaiting next phase file.
 
 ## NEWLY DISCOVERED
 - SECURITY: user shared a GitHub PAT in plaintext in chat. Token was used one-shot (not written to .git/config). **User should rotate this token at https://github.com/settings/tokens — it is now exposed in the chat history.**
@@ -90,4 +95,4 @@ Next.js 16.1.3 (App Router, Turbopack) + React 19 + TS 5 + Tailwind 4 + shadcn/u
 - Agent Browser session open; viewport 1280×900. Screenshots in /home/z/my-project/upload/.
 - Phase 1 file sections done: 1.1 (microstructure) + 1.2 (volatility intelligence) + 1.3 (fractal geometry). User may send 1.4+.
 - examples/websocket/ has a socket.io demo for any future real-time feature.
-- GitHub: https://github.com/shariq-exe/Ai-quant-bot (main branch, HEAD a4895fb).
+- GitHub: https://github.com/shariq-exe/Ai-quant-bot (main branch, HEAD 488e6c8).
