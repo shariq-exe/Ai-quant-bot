@@ -1,8 +1,8 @@
 # PROJECT_MEMORY.md
 
-last_updated: 2026-06-27 15:55 Asia/Calcutta
-turn_count: 25
-last_commit: 676276b (G33-G35 stat-arb + signal injection) — PUSHED to GitHub
+last_updated: 2026-06-27 16:30 Asia/Calcutta
+turn_count: 27
+last_commit: 0b83bee (G37-G42 ML signal synthesis) — PUSHED to GitHub
 
 ## CAPABILITY CHECK
 file_io: yes | terminal: yes | git: yes | network: yes
@@ -98,7 +98,14 @@ Next.js 16.1.3 (App Router, Turbopack) + React 19 + TS 5 + Tailwind 4 + shadcn/u
 - [x] G36 — Agent Browser verify — VERIFIED (9 sections render incl "Statistical Arbitrage & Mean-Reversion", OU spread chart + Kalman residual + cointegration + half-life gate all render real data, "GATE CLOSED" + "half-life 92.4 > 48 holding (won't complete)" visible, no errors, footer sticky, 3/8 VALID unchanged)
 - [x] G5 — Final regression pass — CLEAN (9 endpoints 200, 3/8 VALID, lint clean, pushed cc4ce90..676276b)
 
-**ALL GOALS VERIFIED.** Phase 1 (sections 1.1–1.5) complete, stat-arb spread-reversion wired to execution. Pushed to GitHub (676276b). Awaiting next phase file.
+**Phase 1.6 advanced ML signal synthesis:**
+- [x] G37 — ML feature engineering: 12 research-derived features (VPIN z, HMM prob, Hurst multi-TF, TE both dir, PE, GARCH σ, jump, Kalman residual, Higuchi FD, OFI div, Amihud, half-life) into standardized T×12 matrix with forward-return targets. Rolling window (200 bars, step 20). Per-feature MI with target. — VERIFIED, commit 8255308. 90 samples, permutation-entropy has highest MI (0.230).
+- [x] G38+G39 — Ensemble of specialists (GBT 20 trees depth-3 / Ridge λ=1 / LSTM-proxy EWMA-weighted, all from scratch in pure TS) + anti-overfit validation (CPCV 6 folds with 5-bar embargo, walk-forward anchored expanding, Deflated Sharpe for 12 trials). HMM-gated meta-learner. — VERIFIED. Honest result: validation FAILS ("OOS 0y < 5y synthetic limit; fold std 5.74 > 2.0 unstable") — spec working correctly. GBT R²(train)=0.56, OOS=0.34.
+- [x] G40+G41 — /api/ml endpoint + MLPanel (specialists table with HMM weight bars, ensemble prediction banner, validation gate, SHAP importance bar chart with stable/unstable coloring) + wire ML ensemble signal into signal layer: inject when direction non-flat AND validation passes. 7th signal source. — VERIFIED, commit 0b83bee. Signal correctly idle (ensemble=flat, validation FAILS).
+- [x] G42 — Agent Browser verify — VERIFIED (10 sections render incl "ML Signal Synthesis · Ensemble of Specialists", specialists/ensemble/SHAP all render real data, "VALIDATION FAILS" with honest rationale visible, no errors, footer sticky, 3/8 VALID unchanged)
+- [x] G5 — Final regression pass — CLEAN (10 endpoints 200, 3/8 VALID, lint clean, pushed 676276b..0b83bee)
+
+**ALL GOALS VERIFIED.** Phase 1 (sections 1.1–1.6) complete, ML ensemble wired to execution. Pushed to GitHub (0b83bee). Awaiting next phase file.
 
 ## NEWLY DISCOVERED
 - SECURITY: user shared a GitHub PAT in plaintext in chat. Token was used one-shot (not written to .git/config). **User should rotate this token at https://github.com/settings/tokens — it is now exposed in the chat history.**
@@ -120,9 +127,9 @@ Next.js 16.1.3 (App Router, Turbopack) + React 19 + TS 5 + Tailwind 4 + shadcn/u
 - Quant engine caches series per symbol (96k bars, deterministic seeds) + 5-min TTL on backtest suite cache. Microstructure ~55ms, volatility ~85ms per symbol (fresh each call).
 - 3 validated strategies: decay-mom EUR/USD (Sharpe 3.70, p=0.0019, 1155 trades), carry-proxy EUR/USD (Sharpe 3.57, p=0.0003, 1719 trades), carry-proxy XAU/USD (Sharpe 3.60, p=0.0003, 1645 trades).
 - Agent Browser session open; viewport 1280×900. Screenshots in /home/z/my-project/upload/.
-- Phase 1 file sections done: 1.1 (microstructure) + 1.2 (volatility) + 1.3 (fractal) + 1.4 (information theory) + 1.5 (stat-arb). User may send 1.6+.
+- Phase 1 file sections done: 1.1 (microstructure) + 1.2 (volatility) + 1.3 (fractal) + 1.4 (information theory) + 1.5 (stat-arb) + 1.6 (ML signal synthesis). User may send 1.7+ or Phase 2.
 - examples/websocket/ has a socket.io demo for any future real-time feature.
-- GitHub: https://github.com/shariq-exe/Ai-quant-bot (main branch, HEAD 30b7e58).
-- Execution pipeline now has 6 layered confidence controls: HMM master switch → Higuchi confirmation → MF-DFA modulation → PE sizing → TE cross-asset edge → stat-arb spread-reversion. The first 4 gate regular signals; the last 2 inject additional signals (cross-asset edge when TE spikes, spread-reversion when OU+Kalman agree + half-life valid + cointegrated).
-- 9 API endpoints: /api/strategies, signals, market-data, backtest, microstructure, volatility, fractal, information, statarb. All return 200.
-- Anti-pattern added: Kalman filter on raw log-prices with different scales (log XAU≈7.7 vs log EUR≈0.08) makes β explode to fit the level. FIX: demean both series before the Kalman fit so β tracks the hedge ratio on deviations. See statarb.ts kalmanHedgeRatio.
+- GitHub: https://github.com/shariq-exe/Ai-quant-bot (main branch, HEAD 0b83bee).
+- Execution pipeline now has 7 layered confidence controls + 3 signal injectors: HMM master switch → Higuchi confirmation → MF-DFA modulation → PE sizing → TE cross-asset edge → stat-arb spread-reversion → ML ensemble. The first 4 gate regular signals; the last 3 inject additional signals.
+- 10 API endpoints: /api/strategies, signals, market-data, backtest, microstructure, volatility, fractal, information, statarb, ml. All return 200.
+- ML models built from scratch in pure TypeScript (no external ML libraries): GBT (20 trees, depth-3), Ridge (closed-form with Gaussian elimination), LSTM-proxy (EWMA-weighted linear). CPCV with embargo, walk-forward, Deflated Sharpe (Bailey-López de Prado).
