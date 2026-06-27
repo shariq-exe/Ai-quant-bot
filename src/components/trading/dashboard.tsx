@@ -298,9 +298,9 @@ export function Dashboard() {
                     ? "bg-amber-500/20 border-amber-500/50 text-amber-300"
                     : "bg-slate-800/40 border-slate-700 text-slate-400 hover:border-slate-600"
                 }`}
-                title="Show only signals whose strategy type matches the active HMM regime"
+                title="Show only fully-active signals (HMM regime matches AND fractal gate open)"
               >
-                {regimeOnly ? "✓ REGIME-ACTIVE ONLY" : "regime filter"}
+                {regimeOnly ? "✓ ACTIVE ONLY" : "gate filter"}
               </button>
               <span className="text-[10px] text-slate-600 font-mono">
                 {signals ? `updated ${new Date(signals.generatedAt).toLocaleTimeString()}` : "loading…"}
@@ -310,12 +310,12 @@ export function Dashboard() {
           {signals ? (
             (() => {
               const visible = regimeOnly
-                ? signals.signals.filter((s) => s.regimeActive)
+                ? signals.signals.filter((s) => s.signalStatus === "active")
                 : signals.signals;
               if (visible.length === 0) {
                 return (
                   <div className="text-center py-8 text-[11px] text-slate-500 font-mono border border-dashed border-slate-800 rounded-lg">
-                    no regime-active signals — HMM dispatch suppresses all strategy types this tick
+                    no fully-active signals — HMM dispatch or fractal gate suppresses all this tick
                   </div>
                 );
               }

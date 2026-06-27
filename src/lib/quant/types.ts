@@ -254,14 +254,20 @@ export interface LiveSignal {
   rationale: string;
   indicators: Record<string, number>;
   timestamp: number;
-  // --- Regime-aware dispatch (Phase 1.2 master switch) ---
-  // The HMM-derived dispatch family active for this symbol right now.
+  // --- Regime-aware dispatch (Phase 1.2 HMM master switch) ---
   dispatch: StrategyDispatch;
-  // Whether this strategy's type matches the active dispatch family.
-  // Carry strategies are always eligible (structural harvest, regime-agnostic).
   regimeActive: boolean;
-  // Human-readable reason for the active/inactive classification.
   regimeNote: string;
+  // --- Fractal signal-quality gate (Phase 1.3) ---
+  // The fractal trade-gate status for this symbol: open / caution / closed.
+  fractalGate: "open" | "caution" | "closed";
+  // Composite signal status: BOTH gates must pass for "active".
+  //   active    — HMM regime matches AND fractal gate ≠ closed
+  //   hold      — HMM regime matches BUT fractal gate closed (fractal contradicts)
+  //   suppressed — HMM regime does not match (regardless of fractal)
+  signalStatus: "active" | "hold" | "suppressed";
+  // Human-readable reason for the composite status.
+  statusNote: string;
 }
 
 // Per-symbol dispatch context returned alongside live signals so the dashboard

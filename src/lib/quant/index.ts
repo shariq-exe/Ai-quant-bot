@@ -149,17 +149,22 @@ export function getDispatchContext(): SymbolDispatch[] {
 }
 
 // Generate the current live signal for every strategy × symbol.
-// Each signal is tagged with the HMM master-switch dispatch for its symbol:
-// regimeActive = true when the strategy's type matches the active dispatch
-// family (or it's a regime-agnostic carry strategy). This is the wiring that
-// turns the HMM into the "master switch that determines which sub-strategies
-// are active" per the Phase 1.2 spec.
+// Each signal is tagged with TWO gates:
+//   1. HMM master switch (Phase 1.2): regimeActive = strategy type matches dispatch
+//   2. Fractal signal-quality gate (Phase 1.3): fractalGate = open/caution/closed
+// The composite signalStatus is:
+//   active     — HMM matches AND fractal gate ≠ closed
+//   hold       — HMM matches BUT fractal gate closed (fractal contradicts regime)
+//   suppressed — HMM does not match (regardless of fractal)
+// This implements the spec's "only trade when fractal dimension confirms the regime."
 export function getLiveSignals(): LiveSignal[] {
   const out: LiveSignal[] = [];
   const lookback = 200;
-  // Precompute dispatch per symbol so we don't recompute the HMM per strategy.
+  // Precompute dispatch (HMM) + fractal gate per symbol.
   const dispatchBySymbol = new Map<Symbol, SymbolDispatch>();
   for (const d of getDispatchContext()) dispatchBySymbol.set(d.symbol, d);
+  const fractalBySymbol = new Map<Symbol, FractalReport>();
+  for (const f of getAllFractal(500)) fractalBySymbol.set(f.symbol, f);
 
   for (const strat of STRATEGIES) {
     for (const sym of SYMBOLS) {
@@ -170,6 +175,7 @@ export function getLiveSignals(): LiveSignal[] {
       const direction: LiveSignal["direction"] =
         res.action === "enter-long" ? "long" : res.action === "enter-short" ? "short" : "flat";
       const ctx = dispatchBySymbol.get(sym);
+      const fract = fractalBySymbol.get(sym);
       const family = STRATEGY_DISPATCH[strat.type] ?? "always";
       const regimeActive =
         family === "always" || family === ctx?.dispatch;
@@ -178,6 +184,20 @@ export function getLiveSignals(): LiveSignal[] {
           ? "carry · regime-agnostic"
           : `matches ${ctx?.dispatch} regime`
         : `suppressed — ${ctx?.dispatch} regime active`;
+      const fractalGate = fract?.tradeGate ?? "caution";
+      // Composite 3-state status.
+      let signalStatus: LiveSignal["signalStatus"];
+      let statusNote: string;
+      if (!regimeActive) {
+        signalStatus = "suppressed";
+        statusNote = regimeNote;
+      } else if (fractalGate === "closed") {
+        signalStatus = "hold";
+        statusNote = `HMM ok · fractal gate CLOSED (D=${fract?.higuchi.dimension.toFixed(2)} contradicts ${fract?.dispatch})`;
+      } else {
+        signalStatus = "active";
+        statusNote = regimeNote + (fractalGate === "caution" ? " · fractal caution" : " · fractal confirmed");
+      }
       out.push({
         strategyCode: strat.code,
         strategyName: strat.name,
@@ -192,6 +212,9 @@ export function getLiveSignals(): LiveSignal[] {
         dispatch: ctx?.dispatch ?? "mean-reversion",
         regimeActive,
         regimeNote,
+        fractalGate,
+        signalStatus,
+        statusNote,
       });
     }
   }
