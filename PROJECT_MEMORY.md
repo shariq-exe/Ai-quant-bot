@@ -122,7 +122,7 @@ Next.js 16.1.3 (App Router, Turbopack) + React 19 + TS 5 + Tailwind 4 + shadcn/u
 - Agent Browser session open; viewport 1280×900. Screenshots in /home/z/my-project/upload/.
 - Phase 1 file sections done: 1.1 (microstructure) + 1.2 (volatility) + 1.3 (fractal) + 1.4 (information theory) + 1.5 (stat-arb). User may send 1.6+.
 - examples/websocket/ has a socket.io demo for any future real-time feature.
-- GitHub: https://github.com/shariq-exe/Ai-quant-bot (main branch, HEAD 676276b).
+- GitHub: https://github.com/shariq-exe/Ai-quant-bot (main branch, HEAD 30b7e58).
 - Execution pipeline now has 6 layered confidence controls: HMM master switch → Higuchi confirmation → MF-DFA modulation → PE sizing → TE cross-asset edge → stat-arb spread-reversion. The first 4 gate regular signals; the last 2 inject additional signals (cross-asset edge when TE spikes, spread-reversion when OU+Kalman agree + half-life valid + cointegrated).
 - 9 API endpoints: /api/strategies, signals, market-data, backtest, microstructure, volatility, fractal, information, statarb. All return 200.
 - Anti-pattern added: Kalman filter on raw log-prices with different scales (log XAU≈7.7 vs log EUR≈0.08) makes β explode to fit the level. FIX: demean both series before the Kalman fit so β tracks the hedge ratio on deviations. See statarb.ts kalmanHedgeRatio.
