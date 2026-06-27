@@ -1,8 +1,8 @@
 # PROJECT_MEMORY.md
 
-last_updated: 2026-06-26 15:54 Asia/Calcutta
-turn_count: 5
-last_commit: 6f428f5 (untrack .env/db before public push) — PUSHED to GitHub
+last_updated: 2026-06-26 16:08 Asia/Calcutta
+turn_count: 7
+last_commit: e8ad97b (G12+G13 volatility panel) — PUSHED to GitHub
 
 ## CAPABILITY CHECK
 file_io: yes | terminal: yes | git: yes | network: yes
@@ -45,8 +45,12 @@ Next.js 16.1.3 (App Router, Turbopack) + React 19 + TS 5 + Tailwind 4 + shadcn/u
 - [x] G9 — Agent Browser verify microstructure panel — VERIFIED (gauges, sparkline, metric rows, interpretation render; no errors; no regressions)
 - [x] G5 — Final regression pass — CLEAN (3 VALID strategies, 5 endpoints 200, all 5 dashboard sections render, lint clean, click works)
 - [x] G10 — Push codebase to GitHub (https://github.com/shariq-exe/Ai-quant-bot) — VERIFIED: refs/heads/main=6f428f5 synced, .env/db untracked, token never persisted to .git/config, dev server still HTTP 200
+- [x] G11 — Phase 1.2 volatility intelligence: GARCH(1,1) MLE + 3-state regime classification, Barndorff-Nielsen-Shephard bipower-variation jump detection (z-test), Gaussian HMM (Baum-Welch + Viterbi + forward probs) master switch → strategy dispatch — VERIFIED, commit d5684b0
+- [x] G12+G13 — /api/volatility endpoint + VolatilityPanel (GARCH regime badge + σ_t sparkline, HMM state bars, jump indicator, dispatch banner) — VERIFIED, commit e8ad97b
+- [x] G14 — Agent Browser verify volatility panel — VERIFIED (6 sections render, no errors, real GARCH/HMM/jump data, click dispatch works)
+- [x] G5 — Final regression pass — CLEAN (3 VALID strategies, 6 endpoints 200, all 6 dashboard sections, lint clean)
 
-**ALL GOALS VERIFIED.** Repo pushed to GitHub. Awaiting next phase file from user.
+**ALL GOALS VERIFIED.** Phase 1.1 + 1.2 complete. Pushed to GitHub (e8ad97b). Awaiting next phase file.
 
 ## NEWLY DISCOVERED
 - SECURITY: user shared a GitHub PAT in plaintext in chat. Token was used one-shot (not written to .git/config). **User should rotate this token at https://github.com/settings/tokens — it is now exposed in the chat history.**
@@ -56,10 +60,16 @@ Next.js 16.1.3 (App Router, Turbopack) + React 19 + TS 5 + Tailwind 4 + shadcn/u
 - Forcing z-score-mr valid via threshold loosening — destroys the honest signal. It's legitimately negative after costs on this synthetic data.
 - Per-bar trend drift > baseSigma * 0.2 — causes price collapse/explosion over long runs.
 
+## AGENT BROWSER NOTES
+- After `agent-browser reload`, the session sometimes drops to `about:blank`. Use `agent-browser open http://localhost:3000/` + a 8-9s wait to re-establish.
+- Strategy-table row refs: use `agent-browser snapshot -i` and look for `^- row ` entries (the `<tr>` elements, refs like @e14–@e21). The `generic` wrappers (@e1733+) inside rows are NOT the click targets — clicking them won't fire the row's onClick.
+- Click → backtest fetch takes ~300ms; wait ≥3s (preferably 5s) before checking the heading updated, or the polling re-render may mask the change. Verify via `GET /api/backtest?...` in dev.log, not just the heading text.
+
 ## NOTES
 - Dev server running (pid 1128/1133/1149/1179), port 3000, HTTP 200.
-- Quant engine caches series per symbol (96k bars, deterministic seeds) + 5-min TTL on backtest suite cache. Microstructure computes fresh each call (~55ms).
+- Quant engine caches series per symbol (96k bars, deterministic seeds) + 5-min TTL on backtest suite cache. Microstructure ~55ms, volatility ~85ms per symbol (fresh each call).
 - 3 validated strategies: decay-mom EUR/USD (Sharpe 3.70, p=0.0019, 1155 trades), carry-proxy EUR/USD (Sharpe 3.57, p=0.0003, 1719 trades), carry-proxy XAU/USD (Sharpe 3.60, p=0.0003, 1645 trades).
 - Agent Browser session open; viewport 1280×900. Screenshots in /home/z/my-project/upload/.
-- Phase 1 file (`upload/PHASE_1__..._.md`) covered microstructure (1.1). User may send more sections (1.2+).
+- Phase 1 file sections done: 1.1 (microstructure) + 1.2 (volatility intelligence). User may send 1.3+.
 - examples/websocket/ has a socket.io demo for any future real-time feature.
+- GitHub: https://github.com/shariq-exe/Ai-quant-bot (main branch, HEAD e8ad97b).
