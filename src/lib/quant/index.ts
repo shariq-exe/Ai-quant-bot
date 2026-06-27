@@ -19,7 +19,8 @@ import type { InformationReport } from "./information";
 import { computeStatArb } from "./statarb";
 import type { StatArbReport } from "./statarb";
 import { extractFeatures } from "./ml/features";
-import type { MLFeatureReport } from "./types";
+import { computeML } from "./ml";
+import type { MLFeatureReport, MLReport } from "./types";
 
 // 1-hour bars over ~11 years → ~96k bars per symbol. Long enough that validated
 // strategies accumulate >1000 trades at their proper (non-overfit) thresholds.
@@ -452,9 +453,16 @@ export function getStatArb(lookback = 500): StatArbReport {
 
 // ML feature engineering: extract the 12 research-derived features per spec
 // section 1.6 into a standardized T×12 matrix with forward-return targets.
-// Computed on a rolling window (200 bars, step 20) for tractability.
 export function getMLFeatures(symbol: Symbol, lookback = 2000): MLFeatureReport {
   const { bars } = getSeries(symbol);
   const recent = bars.slice(-lookback);
   return extractFeatures(symbol, recent, 200, 20);
+}
+
+// Full ML report: features + ensemble of specialists (GBT/Ridge/LSTM-proxy)
+// gated by HMM + anti-overfit validation (CPCV + walk-forward + Deflated Sharpe).
+export function getML(symbol: Symbol, lookback = 2000): MLReport {
+  const { bars } = getSeries(symbol);
+  const recent = bars.slice(-lookback);
+  return computeML(symbol, recent, lookback);
 }
